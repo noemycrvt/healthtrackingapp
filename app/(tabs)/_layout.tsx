@@ -18,15 +18,15 @@ export default function TabLayout() {
           ),
         }}
       />
-      {/* <Tabs.Screen
-        name="about"
+      <Tabs.Screen
+        name="calendar"
         options={{
-          title: 'About',
+          title: 'Calendar',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'information-circle' : 'information-circle-outline'} color={color} size={24}/>
+            <Ionicons name={focused ? 'calendar' : 'calendar-outline'} color={color} size={24}/>
           ),
         }}
-      /> */}
+      />
     </Tabs>
   );
 }
