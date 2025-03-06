@@ -4,7 +4,6 @@ import DayCircles from "../../components/DayCircles";
 import AffirmationCard from "../../components/AffirmationCard";
 import NextDoseCard from "../../components/NextDoseCard";
 import MedScheduleCard from "../../components/MedScheduleCard";
-import BottomNav from "../../components/BottomNav";
 import FloatingButton from "../../components/FloatingButton";
 
 // Example medication data
@@ -35,7 +34,7 @@ export default function HomeScreen() {
   return (
     <View className="flex-1 bg-gray-100">
       {/* Day Circles row */}
-      <DayCircles days={days} currentDayIndex={currentDayIndex} />
+      {/* <DayCircles days={days} currentDayIndex={currentDayIndex} /> */}
 
       {/* Main Scrollable Content */}
       <ScrollView className="grow px-4">
