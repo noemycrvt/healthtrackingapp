@@ -1,7 +1,8 @@
-import React from 'react';
-import {View} from 'react-native';
+import React, { useState } from 'react';
+import {View, Text} from 'react-native';
 import {Agenda} from 'react-native-calendars';
 import {useRouter} from 'expo-router';
+import { medicationAgendaItems } from '../data/medicationItems';
 
 /** Returns 'st', 'nd', 'rd', or 'th' based on the day number. */
 function getOrdinalSuffix(dayNumber: number) {
@@ -70,11 +71,13 @@ function getTodayAsDayObject() {
 
 export default function CalendarScreen() {
   const router = useRouter();
+  const [items, setItems] = useState(medicationAgendaItems);
 
   return (
     <View style={{flex: 1, backgroundColor: '#f1f1f1'}}>
       <Agenda
-      selected={getTodayAsDayObject().dateString}
+        items={items}
+        selected={getTodayAsDayObject().dateString}
 
       onCalendarToggled={calendarOpened => {
         if (calendarOpened) {
@@ -93,6 +96,16 @@ export default function CalendarScreen() {
           // e.g. set route params so your header can display that date or "Today"
           router.setParams({ selectedDay: formatted });
         }}
+        renderItem={(item) => {
+            return (
+              <View style={{ margin: 10, padding: 10, backgroundColor: '#fff', borderRadius: 5 }}>
+                <Text style={{ fontWeight: 'bold' }}>{item.name}</Text>
+                <Text>Dosage: {item.dosage}</Text>
+                <Text>Time: {item.time}</Text>
+                <Text>Notes: {item.instructions}</Text>
+              </View>
+            );
+          }}
       />
     </View>
   );
