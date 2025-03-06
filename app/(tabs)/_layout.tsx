@@ -25,6 +25,7 @@ export default function TabLayout() {
         options={({ route }) => ({
           // If route.params?.selectedDay is set, use that. Otherwise 'Calendar'.
           headerTitle: route.params?.selectedDay ?? 'Today',
+          title: "Calendar",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'calendar' : 'calendar-outline'}
@@ -33,6 +34,24 @@ export default function TabLayout() {
             />
           ),
         })}
+      />
+      <Tabs.Screen
+        name="insights"
+        options={{
+          title: 'Insights',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'stats-chart' : 'stats-chart-outline'} color={color} size={24} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="journal"
+        options={{
+          title: 'Journal',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'journal' : 'journal-outline'} color={color} size={24} />
+          ),
+        }}
       />
     </Tabs>
   );
