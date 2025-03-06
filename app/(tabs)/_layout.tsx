@@ -1,6 +1,9 @@
 import { Tabs } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+const today = new Date()
+const formattedDate = today.toLocaleDateString();
+
 export default function TabLayout() {
   return (
     <Tabs
@@ -12,21 +15,25 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          headerTitle: 'Today', // TODO: adjust to the current day of the week chosen by user
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'home-sharp' : 'home-outline'} color={color} size={24} />
           ),
         }}
       />
-      {/* <Tabs.Screen
-        name="about"
-        options={{
-          title: 'About',
+      <Tabs.Screen
+        name="calendar"
+        options={({ route }) => ({
+          // If route.params?.selectedDay is set, use that. Otherwise 'Calendar'.
+          headerTitle: route.params?.selectedDay ?? 'Today',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'information-circle' : 'information-circle-outline'} color={color} size={24}/>
+            <Ionicons
+              name={focused ? 'calendar' : 'calendar-outline'}
+              color={color}
+              size={24}
+            />
           ),
-        }}
-      /> */}
+        })}
+      />
     </Tabs>
   );
 }

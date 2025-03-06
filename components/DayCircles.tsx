@@ -15,12 +15,12 @@ export default function DayCircles({ days, currentDayIndex }: DayCirclesProps) {
           <View key={index} className="items-center">
             <Text className="text-sm font-bold">{day}</Text>
             {isToday ? (
-              <View className="w-7 h-7 bg-black rounded-full flex items-center justify-center mt-1">
-                <Text className="text-white text-xs">{index + 1}</Text>
+              <View className="w-9 h-9 bg-black rounded-full flex items-center justify-center mt-1">
+                <Text className="text-white text-base">{index + 1}</Text>
               </View>
             ) : (
-              <View className="w-7 h-7 rounded-full flex items-center justify-center mt-1">
-                <Text className="text-black text-xs">{index + 1}</Text>
+              <View className="w-9 h-9 rounded-full flex items-center justify-center mt-1">
+                <Text className="text-black text-base">{index + 1}</Text>
               </View>
             )}
           </View>
