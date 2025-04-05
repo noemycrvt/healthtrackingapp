@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
+import { useMedicationNotes } from '../../components/MedicationNotes';
 
 export default function JournalPage() {
   // State for the journal page
@@ -19,6 +20,20 @@ export default function JournalPage() {
   const [painRating, setPainRating] = useState(2);
   const [energyRating, setEnergyRating] = useState(4);
   const [anxietyRating, setAnxietyRating] = useState(3);
+  const {
+    selectedEffects,
+    toggleEffect,
+    effectiveness,
+    setEffectiveness,
+    sideEffects,
+    newEffect,
+    setNewEffect,
+    isAdding,
+    setIsAdding,
+    addCustomEffect,
+    deleteEffect,
+  } = useMedicationNotes();
+  
 
   const moodEmojis = ['😞', '😔', '😐', '🙂', '😊'];
   const painEmojis = ['😊', '🙂', '😐', '😔', '😞'];
@@ -181,50 +196,77 @@ export default function JournalPage() {
           {/* For simplicity, let’s just show a "Side Effects" section + "Effectiveness" section. 
               You could create a "Tabs" system with react-navigation or your own custom logic. */}
           
+        
           {/* Side Effects */}
-          <Text className="text-sm font-semibold mt-2">Side Effects</Text>
-          <View className="flex-row items-center gap-2 bg-gray-100 p-3 mt-2 rounded-lg">
-            {/* Fake checkbox. Use <Switch> or a custom Pressable. */}
-            <Pressable className="w-4 h-4 bg-white border border-gray-400 rounded" />
-            <Text className="text-sm">Headache</Text>
-          </View>
-          <View className="flex-row items-center gap-2 bg-gray-100 p-3 mt-2 rounded-lg">
-            <Pressable className="w-4 h-4 bg-white border border-gray-400 rounded" />
-            <Text className="text-sm">Nausea</Text>
-          </View>
-          <View className="flex-row items-center gap-2 bg-gray-100 p-3 mt-2 rounded-lg">
-            <Pressable className="w-4 h-4 bg-white border border-gray-400 rounded" />
-            <Text className="text-sm">Dizziness</Text>
-          </View>
-          <View className="flex-row items-center gap-2 bg-gray-100 p-3 mt-2 rounded-lg">
-            <Pressable className="w-4 h-4 bg-white border border-gray-400 rounded" />
-            <Text className="text-sm">Fatigue</Text>
-          </View>
-          <Pressable
-            className="w-full mt-2 p-3 border border-gray-300 rounded-lg flex-row items-center justify-center"
-            onPress={() => { /* Add side effect logic */ }}
-          >
+          {sideEffects.map((effect) => (
+            <View
+              key={effect}
+              className="flex-row items-center justify-between bg-gray-100 p-3 mt-2 rounded-lg"
+            >
+              <Pressable
+                onPress={() => toggleEffect(effect)}
+                className="flex-row items-center gap-2"
+              >
+                <View
+                  className={`w-4 h-4 border rounded ${
+                    selectedEffects.includes(effect)
+                      ? 'bg-blue-500 border-blue-500'
+                      : 'bg-white border-gray-400'
+                    }`}
+                  />
+                  <Text className="text-sm">{effect}</Text>
+                </Pressable>
+
+                <Pressable onPress={() => deleteEffect(effect)}>
+                  <Ionicons name="close-circle-outline" size={20} color="gray" />
+                </Pressable>
+              </View>
+            ))}
+
+            {/* Toggle show/hide input */}
+            {isAdding ? (
+              <View className="flex-row items-center mt-2 gap-2">
+                <TextInput
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="Enter custom side effect"
+                  value={newEffect}
+                  onChangeText={setNewEffect}
+                />
+                <Pressable
+                  onPress={addCustomEffect}
+                  className="bg-blue-500 px-3 py-2 rounded-lg"
+                >
+                <Text className="text-white text-sm">Add</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              className="w-full mt-2 p-3 border border-gray-300 rounded-lg flex-row items-center justify-center"
+              onPress={() => setIsAdding(true)}
+            >
             <Ionicons name="add-outline" size={18} color="black" />
             <Text className="text-sm ml-2">Add Custom Side Effect</Text>
-          </Pressable>
+            </Pressable>
+        )}
+
 
           {/* Effectiveness */}
-          <Text className="text-sm font-semibold mt-4">Effectiveness</Text>
-          <Text className="text-xs text-gray-500">
-            How effective was your medication today?
-          </Text>
           <View className="flex-row justify-between gap-2 mt-2">
-            <Pressable className="flex-1 py-3 items-center border border-gray-300 rounded-lg">
-              <Text>Not Working</Text>
-            </Pressable>
-            <Pressable className="flex-1 py-3 items-center border border-gray-300 rounded-lg">
-              <Text>Somewhat</Text>
-            </Pressable>
-            <Pressable className="flex-1 py-3 items-center border border-gray-300 rounded-lg">
-              <Text>Very Effective</Text>
-            </Pressable>
-          </View>
-        </View>
+          {['Not Working', 'Somewhat', 'Very Effective'].map((label) => (
+          <Pressable
+            key={label}
+            onPress={() => setEffectiveness(label)}
+            className={`flex-1 py-3 items-center border rounded-lg ${
+            effectiveness === label
+          ? 'border-blue-500 bg-blue-100'
+          : 'border-gray-300'
+          }`}
+          >
+          <Text>{label}</Text>
+          </Pressable>
+        ))}
+      </View> 
+      </View>
 
         {/* AI INSIGHTS */}
         <View className="bg-blue-50 rounded-md shadow p-4 mb-8">
