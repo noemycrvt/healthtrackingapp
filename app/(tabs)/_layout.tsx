@@ -1,14 +1,43 @@
+import React, { useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { Pressable } from 'react-native';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../../firebaseConfig'; // adjust the path if needed
+import { router } from 'expo-router';
+
 
 const today = new Date()
 const formattedDate = today.toLocaleDateString();
 
 export default function TabLayout() {
+  useEffect(() => {
+    let isMounted = true;
+  
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (isMounted && !user) {
+        router.replace('/(auth)/account');
+      }
+    });
+  
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
+  
   return (
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: '#000000',
+        headerLeft: () => (
+          <Pressable
+            onPress={() => router.push('/account')}
+            style={{ marginLeft: 15 }}
+          >
+            <Ionicons name="person-circle-outline" size={24} color="#000" />
+          </Pressable>
+        ),
       }}
     >
       <Tabs.Screen

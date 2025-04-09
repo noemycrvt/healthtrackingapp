@@ -1,10 +1,16 @@
-import React from "react";
+import React, { useEffect } from 'react';
 import { View, Text, ScrollView } from "react-native";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "../../firebaseConfig";
+import { useRouter } from "expo-router";
+
 import DayCircles from "../../components/DayCircles";
 import AffirmationCard from "../../components/AffirmationCard";
 import NextDoseCard from "../../components/NextDoseCard";
 import MedScheduleCard from "../../components/MedScheduleCard";
 import FloatingButton from "../../components/FloatingButton";
+import { ActivityIndicator } from 'react-native';
+
 
 // Example medication data
 const medScheduleData = [
@@ -26,10 +32,33 @@ const medScheduleData = [
 ];
 
 export default function HomeScreen() {
+  const router = useRouter();
+
+
   // Example array of days (Sun=0 -> Sat=6)
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   // Suppose it's Wednesday
   const currentDayIndex = 3;
+  const [loading, setLoading] = React.useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        router.replace("/account"); // redirect to login
+      }
+      setLoading(false);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  if (loading) {
+    return (
+      <View className="flex-1 justify-center items-center">
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-gray-100">
