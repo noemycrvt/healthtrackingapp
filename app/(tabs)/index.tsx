@@ -1,5 +1,16 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, ScrollView, Modal } from "react-native";
+import React, { useEffect, useState, useContext } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  Modal,
+  ActivityIndicator,
+} from "react-native";
+import { useRouter } from "expo-router";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "../../firebaseConfig";
+
+import { UserContext } from "../../context/UserContext";
 import FloatingButton from "../../components/FloatingButton";
 import MedScheduleCard from "../../components/MedScheduleCard";
 import AddDoseModal from "../../components/AddDoseModal";
@@ -8,12 +19,43 @@ import AffirmationCard from "../../components/AffirmationCard";
 import { MedicationDose } from "../../types/MedicationDose";
 import { format } from "date-fns";
 
+// Get greeting based on current hour
+const getTimeGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+};
+
 export default function HomeScreen() {
+  const router = useRouter();
+  const { userName, loadingUser } = useContext(UserContext);
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [userDoses, setUserDoses] = useState<MedicationDose[]>([]);
-
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [loading, setLoading] = useState(true);
+
   const weekdayIndex = new Date().getDay();
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        router.replace("/account");
+      }
+      setLoading(false);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // refresh every 60 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   const todayDoses = userDoses.filter((dose) =>
     dose.repeatDays.includes(weekdayIndex)
@@ -30,32 +72,33 @@ export default function HomeScreen() {
 
   const getNextDose = () => {
     const now = new Date();
-  
     const upcoming = todayDoses
       .map((dose) => ({
         ...dose,
-        date: new Date(dose.time), // dose.time is ISO string
+        date: new Date(dose.time),
       }))
       .filter((dose) => dose.date > now)
       .sort((a, b) => a.date.getTime() - b.date.getTime());
-  
+
     return upcoming[0];
   };
 
   const nextDose = getNextDose();
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000); // refresh every 60 seconds
-  
-    return () => clearInterval(interval); // cleanup on unmount
-  }, []);
+  if (loading || loadingUser) {
+    return (
+      <View className="flex-1 justify-center items-center">
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-gray-100">
       <ScrollView className="grow px-4">
-        <Text className="text-2xl font-bold mt-4">Good Morning, John!</Text>
+        <Text className="text-2xl font-bold mt-4">
+          {getTimeGreeting()}, {userName || "Guest"}!
+        </Text>
 
         <AffirmationCard
           affirmation="“You are safe. Take a few deep breaths—your strength is greater than your anxiety.”"
