@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 import React, { useEffect, useState, useContext } from "react";
 import {
   View,
@@ -11,10 +12,18 @@ import { useRouter } from "expo-router";
 import { onAuthStateChanged } from "firebase/auth";
 =======
 import React, { useEffect, useState } from 'react';
+=======
+import React, { useEffect, useState, useContext } from 'react';
+>>>>>>> b4148a2 (Added UserContext file)
 import { View, Text, ScrollView, ActivityIndicator } from "react-native";
 import { onAuthStateChanged } from 'firebase/auth';
 >>>>>>> 60b5277 (Added a pop-up for logging out)
 import { auth } from "../../firebaseConfig";
+<<<<<<< HEAD
+=======
+import { useRouter } from "expo-router";
+import { UserContext } from "../UserContext";
+>>>>>>> b4148a2 (Added UserContext file)
 
 <<<<<<< HEAD
 import { UserContext } from "../../context/UserContext";
@@ -43,6 +52,13 @@ const getTimeGreeting = () => {
   return "Good evening";
 };
 
+  const getTimeGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+};
+
 export default function HomeScreen() {
   const router = useRouter();
   const { userName, loadingUser } = useContext(UserContext);
@@ -60,6 +76,7 @@ export default function HomeScreen() {
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   // Suppose it's Wednesday
   const currentDayIndex = 3;
+  const { userName, loadingUser } = useContext(UserContext);
   const [loading, setLoading] = React.useState(true);
   
 >>>>>>> 60b5277 (Added a pop-up for logging out)
@@ -127,8 +144,15 @@ export default function HomeScreen() {
   return (
     <View className="flex-1 bg-gray-100">
       <ScrollView className="grow px-4">
+<<<<<<< HEAD
         <Text className="text-2xl font-bold mt-4">
           {getTimeGreeting()}, {userName || "Guest"}!
+=======
+
+        {/* Greeting using context */}
+        <Text className="text-2xl font-bold mt-4">
+        {getTimeGreeting()}, {userName || "Guest"}
+>>>>>>> b4148a2 (Added UserContext file)
         </Text>
 
         <AffirmationCard

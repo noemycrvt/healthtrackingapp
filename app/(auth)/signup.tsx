@@ -1,4 +1,3 @@
-// app/signup.tsx
 import { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, Alert, Pressable } from 'react-native';
 import { createUserWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
@@ -6,7 +5,7 @@ import { auth } from '../../firebaseConfig';
 import { router, Link } from 'expo-router';
 import { updateProfile } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { db } from '../../firebaseConfig'; // make sure db is exported from firebaseConfig
+import { db } from '../../firebaseConfig';
 
 
 export default function SignUpScreen() {
@@ -72,7 +71,7 @@ export default function SignUpScreen() {
 
   if (checkingUser) {
     console.log('Still checking auth status...');
-    return null; // Optional: show a loading indicator instead
+    return null; //shows a loading indicator
   }
 
 
