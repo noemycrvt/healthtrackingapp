@@ -4,13 +4,16 @@ import { View, Text, TextInput, Button, Alert, Pressable } from 'react-native';
 import { createUserWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../firebaseConfig';
 import { router, Link } from 'expo-router';
+import { updateProfile } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../../firebaseConfig'; // make sure db is exported from firebaseConfig
 
 
 export default function SignUpScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [checkingUser, setCheckingUser] = useState(true);
-
+  const [name, setName] = useState('');
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -25,9 +28,6 @@ export default function SignUpScreen() {
 
 
   const signUp = async () => {
-      console.log("Sign up button clicked");
-      console.log("Creating account with:", email, password);
-
 
     if (!email || !password) {
       Alert.alert('Missing Fields', 'Please enter both email and password.');
@@ -42,7 +42,17 @@ export default function SignUpScreen() {
 
 
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+
+    await updateProfile(user, { displayName: name });
+
+    await setDoc(doc(db, 'users', user.uid), {
+      name: name,
+      email: user.email,
+      createdAt: new Date(),
+    });
+      
       router.replace('/'); // Redirect after signup
     } catch (error: any) {
       let message = error.message;
@@ -68,6 +78,14 @@ export default function SignUpScreen() {
 
   return (
     <View style={{ padding: 20 }}>
+      <Text>Full Name</Text>
+      <TextInput
+      value={name}
+      onChangeText={setName}
+      autoCapitalize="words"
+      style={{ borderWidth: 1, marginBottom: 10, padding: 8 }}
+      />
+
       <Text>Valid Email</Text>
       <TextInput
         value={email}
