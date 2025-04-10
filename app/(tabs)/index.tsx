@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import React, { useEffect, useState, useContext } from "react";
 import {
   View,
@@ -8,8 +9,14 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { onAuthStateChanged } from "firebase/auth";
+=======
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, ActivityIndicator } from "react-native";
+import { onAuthStateChanged } from 'firebase/auth';
+>>>>>>> 60b5277 (Added a pop-up for logging out)
 import { auth } from "../../firebaseConfig";
 
+<<<<<<< HEAD
 import { UserContext } from "../../context/UserContext";
 import FloatingButton from "../../components/FloatingButton";
 import MedScheduleCard from "../../components/MedScheduleCard";
@@ -18,6 +25,15 @@ import NextDoseCard from "../../components/NextDoseCard";
 import AffirmationCard from "../../components/AffirmationCard";
 import { MedicationDose } from "../../types/MedicationDose";
 import { format } from "date-fns";
+=======
+
+
+import DayCircles from "../../components/DayCircles";
+import AffirmationCard from "../../components/AffirmationCard";
+import NextDoseCard from "../../components/NextDoseCard";
+import MedScheduleCard from "../../components/MedScheduleCard";
+import FloatingButton from "../../components/FloatingButton";
+>>>>>>> 60b5277 (Added a pop-up for logging out)
 
 // Get greeting based on current hour
 const getTimeGreeting = () => {
@@ -36,8 +52,17 @@ export default function HomeScreen() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(true);
 
+<<<<<<< HEAD
   const weekdayIndex = new Date().getDay();
 
+=======
+  // Example array of days (Sun=0 -> Sat=6)
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  // Suppose it's Wednesday
+  const currentDayIndex = 3;
+  const [loading, setLoading] = React.useState(true);
+  
+>>>>>>> 60b5277 (Added a pop-up for logging out)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) {
@@ -45,8 +70,9 @@ export default function HomeScreen() {
       }
       setLoading(false);
     });
-
+  
     return unsubscribe;
+<<<<<<< HEAD
   }, []);
 
   useEffect(() => {
@@ -86,6 +112,11 @@ export default function HomeScreen() {
   const nextDose = getNextDose();
 
   if (loading || loadingUser) {
+=======
+  }, []);  
+  
+  if (loading) {
+>>>>>>> 60b5277 (Added a pop-up for logging out)
     return (
       <View className="flex-1 justify-center items-center">
         <ActivityIndicator size="large" />
