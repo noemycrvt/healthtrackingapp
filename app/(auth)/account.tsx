@@ -5,7 +5,6 @@ import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebas
 import { router } from 'expo-router';
 import { Link } from 'expo-router';
 
-
 export default function AccountScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
