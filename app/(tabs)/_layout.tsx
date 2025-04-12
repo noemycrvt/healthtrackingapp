@@ -1,11 +1,13 @@
 import { Tabs } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import Toast from 'react-native-toast-message';
 
 const today = new Date()
 const formattedDate = today.toLocaleDateString();
 
 export default function TabLayout() {
   return (
+    <>
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: '#000000',
@@ -54,5 +56,7 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    <Toast position="top"/>
+    </>
   );
 }

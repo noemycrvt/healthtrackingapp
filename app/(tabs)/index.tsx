@@ -1,72 +1,94 @@
-import React from "react";
-import { View, Text, ScrollView } from "react-native";
-import DayCircles from "../../components/DayCircles";
-import AffirmationCard from "../../components/AffirmationCard";
-import NextDoseCard from "../../components/NextDoseCard";
-import MedScheduleCard from "../../components/MedScheduleCard";
+import React, { useState, useEffect } from "react";
+import { View, Text, ScrollView, Modal } from "react-native";
 import FloatingButton from "../../components/FloatingButton";
-
-// Example medication data
-const medScheduleData = [
-  {
-    time: "9:00 AM",
-    meds: [
-      { name: "Antibiotics", details: "100mg, 1 pill" },
-      { name: "Ibuprofen", details: "200mg, 2 pills" },
-      { name: "Metformin", details: "500mg, 1 pill" }
-    ]
-  },
-  {
-    time: "12:00 PM",
-    meds: [
-      { name: "Antibiotics", details: "100mg, 1 pill" },
-      { name: "Ibuprofen", details: "200mg, 2 pills" }
-    ]
-  }
-];
+import MedScheduleCard from "../../components/MedScheduleCard";
+import AddDoseModal from "../../components/AddDoseModal";
+import NextDoseCard from "../../components/NextDoseCard";
+import AffirmationCard from "../../components/AffirmationCard";
+import { MedicationDose } from "../../types/MedicationDose";
+import { format } from "date-fns";
 
 export default function HomeScreen() {
-  // Example array of days (Sun=0 -> Sat=6)
-  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  // Suppose it's Wednesday
-  const currentDayIndex = 3;
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [userDoses, setUserDoses] = useState<MedicationDose[]>([]);
+
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const weekdayIndex = new Date().getDay();
+
+  const todayDoses = userDoses.filter((dose) =>
+    dose.repeatDays.includes(weekdayIndex)
+  );
+
+  const groupedByTime = todayDoses.reduce((acc, curr) => {
+    const formattedTime = format(new Date(curr.time), "h:mm a");
+    if (!acc[formattedTime]) acc[formattedTime] = [];
+    acc[formattedTime].push({ name: curr.name, details: curr.details });
+    return acc;
+  }, {} as Record<string, { name: string; details: string }[]>);
+
+  const sortedTimes = Object.keys(groupedByTime);
+
+  const getNextDose = () => {
+    const now = new Date();
+  
+    const upcoming = todayDoses
+      .map((dose) => ({
+        ...dose,
+        date: new Date(dose.time), // dose.time is ISO string
+      }))
+      .filter((dose) => dose.date > now)
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+  
+    return upcoming[0];
+  };
+
+  const nextDose = getNextDose();
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // refresh every 60 seconds
+  
+    return () => clearInterval(interval); // cleanup on unmount
+  }, []);
 
   return (
     <View className="flex-1 bg-gray-100">
-      {/* Day Circles row */}
-      {/* <DayCircles days={days} currentDayIndex={currentDayIndex} /> */}
-
-      {/* Main Scrollable Content */}
       <ScrollView className="grow px-4">
-        {/* Greeting */}
         <Text className="text-2xl font-bold mt-4">Good Morning, John!</Text>
 
-        {/* Affirmation Box */}
         <AffirmationCard
           affirmation="“You are safe. Take a few deep breaths—your strength is greater than your anxiety.”"
           nextCheckin="Next Check-In: 9:00 AM"
         />
 
-        {/* Next Dose */}
         <NextDoseCard
-          doseText="Next Dose: Antibiotics @ 9:00 AM"
+          doseText={
+            nextDose
+              ? `Next Dose: ${nextDose.name} @ ${format(new Date(nextDose.time), "h:mm a")}`
+              : "No more doses today 🎉"
+          }
         />
 
-        {/* Today's Meds Title */}
         <Text className="text-lg font-bold mt-4">Today's Meds</Text>
 
-        {/* Medication Schedules */}
-        {medScheduleData.map((item, index) => (
-          <MedScheduleCard
-            key={index}
-            time={item.time}
-            meds={item.meds}
-          />
-        ))}
+        {sortedTimes.length === 0 ? (
+          <Text className="text-base mt-2">No scheduled medications today.</Text>
+        ) : (
+          sortedTimes.map((time) => (
+            <MedScheduleCard key={time} time={time} meds={groupedByTime[time]} />
+          ))
+        )}
       </ScrollView>
 
-      {/* Floating '+' Button */}
-      <FloatingButton onPress={() => {}} />
+      <FloatingButton onPress={() => setShowAddModal(true)} />
+
+      <Modal visible={showAddModal} animationType="slide">
+        <AddDoseModal
+          onClose={() => setShowAddModal(false)}
+          onSave={(dose) => setUserDoses((prev) => [...prev, dose])}
+        />
+      </Modal>
     </View>
   );
 }
