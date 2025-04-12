@@ -13,10 +13,10 @@ export const authStyles = StyleSheet.create({
   },
   
 formCard: {
-    width: '70%',
+    width: '90%',
     maxWidth: 400,
     backgroundColor: '#ffffff',
-    padding: 20,
+    padding: 30,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#ccc', 

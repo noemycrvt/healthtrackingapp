@@ -3,7 +3,7 @@ import { View, Text, TextInput, Button, Alert, TouchableOpacity } from 'react-na
 import { auth } from '../../firebaseConfig';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { router, Link } from 'expo-router';
-import { authStyles } from './authStyles'; 
+import { authStyles } from '../../styles/authStyles'; 
 
 export default function AccountScreen() {
   const [email, setEmail] = useState('');

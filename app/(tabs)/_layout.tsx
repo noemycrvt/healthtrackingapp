@@ -122,12 +122,14 @@ export default function TabLayout() {
     onRequestClose={() => setProfileVisible(false)}
   >
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000000aa' }}>
-      <View style={{ width: '20%', backgroundColor: 'white', padding: 20, borderRadius: 10 }}>
-      <Text style={{ fontSize: 18, marginBottom: 20 }}>Hi, {userName}!</Text>
-      <View style={{ marginBottom: 10 }}>
-        <Button title="Logout" onPress={logout} color="#6699FF" />
+      <View style={{ width: '80%', maxWidth: 400, backgroundColor: 'white', padding: 20, borderRadius: 10, alignItems: 'center'}}>
+      <Text style={{ fontSize: 18, marginBottom: 20, textAlign: 'center'}}>Hi, {userName}!</Text>
+      <View style={{ width: '100%', marginBottom: 10 }}>
+        <Button title="LOGOUT" onPress={logout} color="#6699FF" />
       </View>
-      <Button title="Close" onPress={() => setProfileVisible(false)} color="#6699FF"/>
+      <View style={{ width: '100%' }}>
+      <Button title="CLOSE" onPress={() => setProfileVisible(false)} color="#6699FF"/>
+      </View>
       </View>
     </View>
   </Modal>

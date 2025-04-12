@@ -22,8 +22,12 @@ import { auth } from "../../firebaseConfig";
 <<<<<<< HEAD
 =======
 import { useRouter } from "expo-router";
+<<<<<<< HEAD
 import { UserContext } from "../UserContext";
 >>>>>>> b4148a2 (Added UserContext file)
+=======
+import { UserContext } from "../../context/UserContext";
+>>>>>>> f4ba524 (Changed things for IOS)
 
 <<<<<<< HEAD
 import { UserContext } from "../../context/UserContext";

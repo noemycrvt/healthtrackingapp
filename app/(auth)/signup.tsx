@@ -4,7 +4,7 @@ import { createUserWithEmailAndPassword, onAuthStateChanged, updateProfile } fro
 import { auth, db } from '../../firebaseConfig';
 import { router, Link } from 'expo-router';
 import { doc, setDoc } from 'firebase/firestore';
-import { authStyles } from './authStyles'; 
+import { authStyles } from '../../styles/authStyles'; 
 
 export default function SignUpScreen() {
   const [email, setEmail] = useState('');
