@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
 import React, { useEffect, useState, useContext } from "react";
 import {
   View,
@@ -10,26 +8,8 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { onAuthStateChanged } from "firebase/auth";
-=======
-import React, { useEffect, useState } from 'react';
-=======
-import React, { useEffect, useState, useContext } from 'react';
->>>>>>> b4148a2 (Added UserContext file)
-import { View, Text, ScrollView, ActivityIndicator } from "react-native";
-import { onAuthStateChanged } from 'firebase/auth';
->>>>>>> 60b5277 (Added a pop-up for logging out)
 import { auth } from "../../firebaseConfig";
-<<<<<<< HEAD
-=======
-import { useRouter } from "expo-router";
-<<<<<<< HEAD
-import { UserContext } from "../UserContext";
->>>>>>> b4148a2 (Added UserContext file)
-=======
-import { UserContext } from "../../context/UserContext";
->>>>>>> f4ba524 (Changed things for IOS)
 
-<<<<<<< HEAD
 import { UserContext } from "../../context/UserContext";
 import FloatingButton from "../../components/FloatingButton";
 import MedScheduleCard from "../../components/MedScheduleCard";
@@ -38,25 +18,9 @@ import NextDoseCard from "../../components/NextDoseCard";
 import AffirmationCard from "../../components/AffirmationCard";
 import { MedicationDose } from "../../types/MedicationDose";
 import { format } from "date-fns";
-=======
-
-
-import DayCircles from "../../components/DayCircles";
-import AffirmationCard from "../../components/AffirmationCard";
-import NextDoseCard from "../../components/NextDoseCard";
-import MedScheduleCard from "../../components/MedScheduleCard";
-import FloatingButton from "../../components/FloatingButton";
->>>>>>> 60b5277 (Added a pop-up for logging out)
 
 // Get greeting based on current hour
 const getTimeGreeting = () => {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
-};
-
-  const getTimeGreeting = () => {
   const hour = new Date().getHours();
   if (hour < 12) return "Good morning";
   if (hour < 18) return "Good afternoon";
@@ -72,18 +36,8 @@ export default function HomeScreen() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(true);
 
-<<<<<<< HEAD
   const weekdayIndex = new Date().getDay();
 
-=======
-  // Example array of days (Sun=0 -> Sat=6)
-  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  // Suppose it's Wednesday
-  const currentDayIndex = 3;
-  const { userName, loadingUser } = useContext(UserContext);
-  const [loading, setLoading] = React.useState(true);
-  
->>>>>>> 60b5277 (Added a pop-up for logging out)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) {
@@ -91,9 +45,8 @@ export default function HomeScreen() {
       }
       setLoading(false);
     });
-  
+
     return unsubscribe;
-<<<<<<< HEAD
   }, []);
 
   useEffect(() => {
@@ -133,11 +86,6 @@ export default function HomeScreen() {
   const nextDose = getNextDose();
 
   if (loading || loadingUser) {
-=======
-  }, []);  
-  
-  if (loading) {
->>>>>>> 60b5277 (Added a pop-up for logging out)
     return (
       <View className="flex-1 justify-center items-center">
         <ActivityIndicator size="large" />
@@ -148,15 +96,8 @@ export default function HomeScreen() {
   return (
     <View className="flex-1 bg-gray-100">
       <ScrollView className="grow px-4">
-<<<<<<< HEAD
         <Text className="text-2xl font-bold mt-4">
           {getTimeGreeting()}, {userName || "Guest"}!
-=======
-
-        {/* Greeting using context */}
-        <Text className="text-2xl font-bold mt-4">
-        {getTimeGreeting()}, {userName || "Guest"}
->>>>>>> b4148a2 (Added UserContext file)
         </Text>
 
         <AffirmationCard
