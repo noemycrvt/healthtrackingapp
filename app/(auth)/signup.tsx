@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button } from 'react-native';
-import { createUserWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../../firebaseConfig';
+import { View, Text, TextInput, Button, Alert, TouchableOpacity } from 'react-native';
+import { createUserWithEmailAndPassword, onAuthStateChanged, updateProfile } from 'firebase/auth';
+import { auth, db } from '../../firebaseConfig';
 import { router, Link } from 'expo-router';
-import { updateProfile } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { db } from '../../firebaseConfig';
-import { Alert} from 'react-native';
+import { authStyles } from './authStyles'; 
 
 export default function SignUpScreen() {
   const [email, setEmail] = useState('');
@@ -14,6 +12,9 @@ export default function SignUpScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [checkingUser, setCheckingUser] = useState(true);
   const [name, setName] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -29,7 +30,7 @@ export default function SignUpScreen() {
 
   const signUp = async () => {
     if (!email.trim() || !password.trim() || !confirmPassword.trim() || !name.trim()) {
-      console.alert('Missing Fields', 'Please fill out all fields.');
+      Alert.alert('Missing Fields', 'Please fill out all fields.');
       return;
     }
 
@@ -77,42 +78,67 @@ export default function SignUpScreen() {
 
 
   return (
-    <View style={{ padding: 20 }}>
-      <Text>Full Name</Text>
-      <TextInput
-      value={name}
-      onChangeText={setName}
-      autoCapitalize="words"
-      style={{ borderWidth: 1, marginBottom: 10, padding: 8 }}
-      />
-
-      <Text>Email</Text>
-      <TextInput
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        style={{ borderWidth: 1, marginBottom: 10, padding: 8 }}
-      />
-      <Text>Password</Text>
-      <TextInput
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        style={{ borderWidth: 1, marginBottom: 20, padding: 8 }}
-      />
-      <Text>Confirm Password</Text>
-      <TextInput
-        value={confirmPassword}
-        onChangeText={setConfirmPassword}
-        secureTextEntry
-        style={{ borderWidth: 1, marginBottom: 20, padding: 8 }}
-      />
-      <Button title="Sign Up" onPress={signUp}/>
-      <Link href="/account" style={{ marginTop: 16, textAlign: 'center' }}>
-        Already have an account? Log in
-      </Link>
+    <View style={authStyles.container}>
+      <View style={authStyles.formCard}>
+        <Text style={authStyles.label}>Full Name</Text>
+        <TextInput
+          value={name}
+          onChangeText={setName}
+          autoCapitalize="words"
+          style={authStyles.input}
+        />
+  
+        <Text style={authStyles.label}>Email</Text>
+        <TextInput
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          style={authStyles.input}
+        />
+  
+        <Text style={authStyles.label}>Password</Text>
+        <View style={authStyles.passwordWrapper }>
+        <TextInput
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={!showPassword}
+          style={[authStyles.input, authStyles.inputWithToggle]}
+        />
+        <TouchableOpacity
+          style={authStyles.toggleButton}
+          onPress={() => setShowPassword(prev => !prev)}>
+          <Text style={authStyles.toggleText}>
+            {showPassword ? 'Hide' : 'Show'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+  
+        <Text style={authStyles.label}>Confirm Password</Text>
+        <View style={authStyles.passwordWrapper}>
+        <TextInput
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          secureTextEntry= {!showConfirmPassword}
+          style={[authStyles.input, authStyles.inputWithToggle]}
+        />
+        <TouchableOpacity
+          style={authStyles.toggleButton}
+          onPress={() => setShowConfirmPassword(prev => !prev)}>
+          <Text style={authStyles.toggleText}>
+            {showConfirmPassword ? 'Hide' : 'Show'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+  
+        <TouchableOpacity style={authStyles.button} onPress={signUp}>
+          <Text style={authStyles.buttonText}>Sign Up</Text>
+        </TouchableOpacity>
+  
+        <Link href="/account" style={authStyles.link}>
+          Already have an account? Log in
+        </Link>
+      </View>
     </View>
   );
 }
-
