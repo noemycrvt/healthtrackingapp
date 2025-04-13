@@ -4,13 +4,19 @@ import {
   Text,
   ScrollView,
   Modal,
+  Pressable,
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../../firebaseConfig";
-import { collection, getDocs } from "firebase/firestore";
-
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  orderBy,
+} from "firebase/firestore";
 import { UserContext } from "../../context/UserContext";
 import FloatingButton from "../../components/FloatingButton";
 import MedScheduleCard from "../../components/MedScheduleCard";
@@ -32,12 +38,14 @@ export default function HomeScreen() {
   const { userName, loadingUser } = useContext(UserContext);
 
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingDose, setEditingDose] = useState<MedicationDose | null>(null);
+  const [editingGroup, setEditingGroup] = useState<MedicationDose[] | null>(
+    null
+  );
   const [userDoses, setUserDoses] = useState<MedicationDose[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(true);
 
-  const todayStr = format(new Date(), "yyyy-MM-dd"); // 🔧 Get today's date string
+  const todayStr = format(new Date(), "yyyy-MM-dd");
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -55,14 +63,12 @@ export default function HomeScreen() {
   const fetchUserDoses = async (uid: string) => {
     try {
       const medsRef = collection(db, "users", uid, "medications");
-      const snapshot = await getDocs(medsRef);
+      const snapshot = await getDocs(query(medsRef, orderBy("time")));
       const all = snapshot.docs.map((doc) => doc.data() as MedicationDose);
-
-      // 🔧 Filter by date, not repeatDays
       const todayFiltered = all.filter((d) => d.date === todayStr);
       setUserDoses(todayFiltered);
     } catch (error) {
-      console.error("Error fetching user medications:", error);
+      console.error("Error fetching medications:", error);
     }
   };
 
@@ -76,15 +82,14 @@ export default function HomeScreen() {
   const groupedByTime = userDoses.reduce((acc, curr) => {
     const formattedTime = format(new Date(curr.time), "h:mm a");
     if (!acc[formattedTime]) acc[formattedTime] = [];
-    acc[formattedTime].push({ name: curr.name, details: curr.details });
+    acc[formattedTime].push({ ...curr });
     return acc;
-  }, {} as Record<string, { name: string; details: string }[]>);
+  }, {} as Record<string, MedicationDose[]>);
 
   const sortedTimes = Object.keys(groupedByTime);
 
   const getNextDose = () => {
     const now = new Date();
-
     const upcoming = userDoses
       .map((dose) => ({
         ...dose,
@@ -117,11 +122,20 @@ export default function HomeScreen() {
           affirmation="“You are safe. Take a few deep breaths—your strength is greater than your anxiety.”"
           nextCheckin="Next Check-In: 9:00 AM"
         />
+        <Pressable
+          onPress={() => router.push("/medications")}
+          className="bg-blue-500 px-4 py-2 rounded mb-4 mt-2"
+        >
+          <Text className="text-white text-center">View All Medications</Text>
+        </Pressable>
 
         <NextDoseCard
           doseText={
             nextDose
-              ? `Next Dose: ${nextDose.name} @ ${format(new Date(nextDose.time), "h:mm a")}`
+              ? `Next Dose: ${nextDose.name} @ ${format(
+                  new Date(nextDose.time),
+                  "h:mm a"
+                )}`
               : "No more doses today 🎉"
           }
         />
@@ -137,9 +151,9 @@ export default function HomeScreen() {
               time={time}
               meds={groupedByTime[time]}
               onEdit={(name) => {
-                const doseToEdit = userDoses.find((d) => d.name === name);
-                if (doseToEdit) {
-                  setEditingDose(doseToEdit);
+                const group = userDoses.filter((d) => d.name === name);
+                if (group.length > 0) {
+                  setEditingGroup(group);
                   setShowAddModal(true);
                 }
               }}
@@ -150,24 +164,23 @@ export default function HomeScreen() {
         )}
       </ScrollView>
 
-      <FloatingButton onPress={() => setShowAddModal(true)} />
+      <FloatingButton
+        onPress={() => {
+          setEditingGroup(null);
+          setShowAddModal(true);
+        }}
+      />
 
       <Modal visible={showAddModal} animationType="slide">
         <AddDoseModal
-          existingDose={editingDose || undefined}
+          medicationGroup={editingGroup || undefined}
           onClose={() => {
             setShowAddModal(false);
-            setEditingDose(null);
+            setEditingGroup(null);
           }}
-          onSave={(dose) => {
-            setUserDoses((prev) => {
-              const exists = prev.find((d) => d.id === dose.id);
-              return exists
-                ? prev.map((d) => (d.id === dose.id ? dose : d))
-                : [...prev, dose];
-            });
-            setEditingDose(null);
-            setShowAddModal(false);
+          onSave={() => {
+            setEditingGroup(null);
+            fetchUserDoses(auth.currentUser?.uid || "");
           }}
         />
       </Modal>
