@@ -6,6 +6,8 @@ import { useMedicationNotes } from './MedicationNotes';
 import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { db, auth } from '../firebaseConfig';
 
+
+
 interface Props {
   onSave: () => void;
   onCancel: () => void;
@@ -20,6 +22,7 @@ export default function JournalEntry({ onSave, onCancel, existingEntry, isEditMo
   const [painRating, setPainRating] = useState(existingEntry?.painRating ?? 2);
   const [energyRating, setEnergyRating] = useState(existingEntry?.energyRating ?? 4);
   const [anxietyRating, setAnxietyRating] = useState(existingEntry?.anxietyRating ?? 3);
+  
 
   const {
     selectedEffects,
@@ -27,6 +30,7 @@ export default function JournalEntry({ onSave, onCancel, existingEntry, isEditMo
     effectiveness,
     setEffectiveness,
     sideEffects,
+    setSideEffects,
     newEffect,
     setNewEffect,
     isAdding,
@@ -36,9 +40,13 @@ export default function JournalEntry({ onSave, onCancel, existingEntry, isEditMo
     setSelectedEffects,
   } = useMedicationNotes();
 
+
   useEffect(() => {
     if (existingEntry?.selectedEffects) setSelectedEffects(existingEntry.selectedEffects);
     if (existingEntry?.effectiveness) setEffectiveness(existingEntry.effectiveness);
+    if (existingEntry?.sideEffects) {
+      setSideEffects(existingEntry.sideEffects);
+    }
   }, [existingEntry]);
 
   const moodEmojis = ['😞', '😔', '😐', '🙂', '😊'];
@@ -63,7 +71,18 @@ export default function JournalEntry({ onSave, onCancel, existingEntry, isEditMo
       anxietyRating,
       selectedEffects,
       effectiveness,
+      sideEffects,
     };
+
+    console.log("Saving entry:", {
+      journalEntry,
+      moodRating,
+      painRating,
+      energyRating,
+      anxietyRating,
+      selectedEffects,
+      effectiveness,
+    });
 
     try {
       if (existingEntry?.id) {

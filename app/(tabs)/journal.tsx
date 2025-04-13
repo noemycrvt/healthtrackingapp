@@ -14,6 +14,7 @@ import FloatingButton from "../../components/FloatingButton";
 import JournalEntry from "../../components/JournalEntry";
 import { format } from "date-fns";
 
+
 interface JournalEntryType {
   id: string;
   date: string;
@@ -40,16 +41,18 @@ export default function JournalPage() {
       if (!user) return;
       try {
         const ref = collection(db, "users", user.uid, "journalEntries");
+
         const snapshot = await getDocs(ref);
         const docs: JournalEntryType[] = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
+        id: doc.id,
+        ...doc.data(),
         })) as JournalEntryType[];
+
         setEntries(
-          docs.sort(
-            (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-          )
+        docs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         );
+
+
       } catch (e) {
         console.error("Failed to fetch journal entries", e);
       } finally {
@@ -107,7 +110,7 @@ export default function JournalPage() {
       <Modal visible={!!selectedEntry} animationType="slide">
   <JournalEntry
     existingEntry={selectedEntry}
-    isEditMode={false}
+    isEditMode={true}
     onCancel={() => setSelectedEntry(null)}
     onSave={() => {
       setSelectedEntry(null);
