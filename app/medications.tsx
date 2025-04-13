@@ -2,14 +2,24 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, ActivityIndicator, Text } from 'react-native';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../firebaseConfig';
-import { collection, getDocs } from 'firebase/firestore';
+import {
+  collection,
+  getDocs,
+  query,
+  orderBy,
+} from 'firebase/firestore';
+import { MedicationGroup } from '../types/MedicationGroup';
 import { MedicationDose } from '../types/MedicationDose';
-import MedicationGroupCard from '../components/MedCard'; // or rename back if desired
+import MedicationGroupCard from '../components/MedCard';
+import AddDoseModal from '../components/AddDoseModal';
 import { useRouter } from 'expo-router';
 
 export default function MedicationsScreen() {
   const [loading, setLoading] = useState(true);
-  const [medications, setMedications] = useState<Record<string, MedicationDose[]>>({});
+  const [groups, setGroups] = useState<MedicationGroup[]>([]);
+  const [groupDoses, setGroupDoses] = useState<Record<string, MedicationDose[]>>({});
+  const [editingGroup, setEditingGroup] = useState<MedicationGroup | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const router = useRouter();
 
   useEffect(() => {
@@ -19,68 +29,77 @@ export default function MedicationsScreen() {
         return;
       }
 
-      const ref = collection(db, 'users', user.uid, 'medications');
-      const snapshot = await getDocs(ref);
-      const doses = snapshot.docs.map(doc => doc.data() as MedicationDose);
+      const groupsRef = collection(db, 'users', user.uid, 'medicationGroups');
+      const groupsSnap = await getDocs(groupsRef);
+      const groupList = groupsSnap.docs.map(doc => doc.data() as MedicationGroup);
 
-      // Group all doses by medicationId
-      const grouped: Record<string, MedicationDose[]> = {};
+      const dosesByGroup: Record<string, MedicationDose[]> = {};
 
-      for (const dose of doses) {
-        if (!grouped[dose.medicationId]) {
-          grouped[dose.medicationId] = [];
-        }
-        grouped[dose.medicationId].push(dose);
-      }
+      await Promise.all(groupList.map(async (group) => {
+        const dosesRef = collection(db, 'users', user.uid, 'medicationGroups', group.id, 'doses');
+        const q = query(dosesRef, orderBy('time', 'asc'));
+        const doseSnap = await getDocs(q);
+        dosesByGroup[group.id] = doseSnap.docs.map(doc => doc.data() as MedicationDose);
+      }));
 
-      // Sort each group by time
-      Object.values(grouped).forEach(group =>
-        group.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
-      );
-
-      setMedications(grouped);
+      setGroups(groupList);
+      setGroupDoses(dosesByGroup);
       setLoading(false);
     });
 
     return unsubscribe;
-  }, []);
+  }, [refreshKey]);
 
-  const handleEditGroup = (medicationId: string) => {
-    console.log('Edit group', medicationId);
-    // Add navigation or modal logic here
+  const handleEditGroup = (groupId: string) => {
+    const group = groups.find(g => g.id === groupId);
+    if (group) {
+      setEditingGroup(group);
+    }
   };
 
-  const handleDeleteGroup = (medicationId: string) => {
-    console.log('Delete group', medicationId);
-    // Add confirmation and deletion logic here
+  const handleDeleteGroup = (groupId: string) => {
+    console.log('Delete group', groupId);
+    // Optional: Implement delete logic here
   };
 
   return (
-    <ScrollView className="flex-1 bg-gray-100 p-4">
-      <Text className="text-2xl font-bold mb-4">All Medications</Text>
+    <>
+      <ScrollView className="flex-1 bg-gray-100 p-4">
+        <Text className="text-2xl font-bold mb-4">All Medications</Text>
 
-      {loading ? (
-        <ActivityIndicator size="large" />
-      ) : Object.keys(medications).length === 0 ? (
-        <Text>No medications found.</Text>
-      ) : (
-        Object.entries(medications).map(([medicationId, doses]) => {
-          const first = doses[0];
-          const last = doses[doses.length - 1];
+        {loading ? (
+          <ActivityIndicator size="large" />
+        ) : groups.length === 0 ? (
+          <Text>No medications found.</Text>
+        ) : (
+          groups.map((group) => {
+            const doses = groupDoses[group.id] || [];
 
-          return (
-            <MedicationGroupCard
-              key={medicationId}
-              name={first.name}
-              details={first.details}
-              startDate={first.date}
-              endDate={last.date}
-              onEdit={() => handleEditGroup(medicationId)}
-              onDelete={() => handleDeleteGroup(medicationId)}
-            />
-          );
-        })
+            return (
+              <MedicationGroupCard
+                key={group.id}
+                name={group.name}
+                details={group.details}
+                startDate={group.startDate}
+                endDate={group.endDate}
+                onEdit={() => handleEditGroup(group.id)}
+                onDelete={() => handleDeleteGroup(group.id)}
+              />
+            );
+          })
+        )}
+      </ScrollView>
+
+      {editingGroup && (
+        <AddDoseModal
+          medicationGroup={editingGroup}
+          onClose={() => setEditingGroup(null)}
+          onSave={() => {
+            setEditingGroup(null);
+            setRefreshKey(prev => prev + 1);
+          }}
+        />
       )}
-    </ScrollView>
+    </>
   );
 }

@@ -14,7 +14,6 @@ import {
   collection,
   getDocs,
   query,
-  where,
   orderBy,
 } from "firebase/firestore";
 import { UserContext } from "../../context/UserContext";
@@ -24,6 +23,7 @@ import AddDoseModal from "../../components/AddDoseModal";
 import NextDoseCard from "../../components/NextDoseCard";
 import AffirmationCard from "../../components/AffirmationCard";
 import { MedicationDose } from "../../types/MedicationDose";
+import { MedicationGroup } from "../../types/MedicationGroup";
 import { format } from "date-fns";
 
 const getTimeGreeting = () => {
@@ -38,10 +38,8 @@ export default function HomeScreen() {
   const { userName, loadingUser } = useContext(UserContext);
 
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingGroup, setEditingGroup] = useState<MedicationDose[] | null>(
-    null
-  );
-  const [userDoses, setUserDoses] = useState<MedicationDose[]>([]);
+  const [editingGroup, setEditingGroup] = useState<MedicationGroup | null>(null);
+  const [userDoses, setUserDoses] = useState<(MedicationDose & { group: MedicationGroup })[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(true);
 
@@ -62,13 +60,24 @@ export default function HomeScreen() {
 
   const fetchUserDoses = async (uid: string) => {
     try {
-      const medsRef = collection(db, "users", uid, "medications");
-      const snapshot = await getDocs(query(medsRef, orderBy("time")));
-      const all = snapshot.docs.map((doc) => doc.data() as MedicationDose);
-      const todayFiltered = all.filter((d) => d.date === todayStr);
+      const groupsRef = collection(db, "users", uid, "medicationGroups");
+      const groupSnap = await getDocs(groupsRef);
+      const groupList = groupSnap.docs.map((doc) => doc.data() as MedicationGroup);
+
+      const allDoses: (MedicationDose & { group: MedicationGroup })[] = [];
+
+      for (const group of groupList) {
+        const dosesRef = collection(db, "users", uid, "medicationGroups", group.id, "doses");
+        const q = query(dosesRef, orderBy("time"));
+        const snapshot = await getDocs(q);
+        const groupDoses = snapshot.docs.map((doc) => doc.data() as MedicationDose);
+        allDoses.push(...groupDoses.map(d => ({ ...d, group })));
+      }
+
+      const todayFiltered = allDoses.filter((d) => d.date === todayStr);
       setUserDoses(todayFiltered);
     } catch (error) {
-      console.error("Error fetching medications:", error);
+      console.error("Error fetching doses:", error);
     }
   };
 
@@ -82,11 +91,14 @@ export default function HomeScreen() {
   const groupedByTime = userDoses.reduce((acc, curr) => {
     const formattedTime = format(new Date(curr.time), "h:mm a");
     if (!acc[formattedTime]) acc[formattedTime] = [];
-    acc[formattedTime].push({ ...curr });
+    acc[formattedTime].push(curr);
     return acc;
-  }, {} as Record<string, MedicationDose[]>);
+  }, {} as Record<string, (MedicationDose & { group: MedicationGroup })[]>);
 
-  const sortedTimes = Object.keys(groupedByTime);
+  const sortedTimes = Object.keys(groupedByTime).sort((a, b) => {
+    const toDate = (t: string) => new Date(`1970-01-01T${t}`);
+    return toDate(a).getTime() - toDate(b).getTime();
+  });
 
   const getNextDose = () => {
     const now = new Date();
@@ -132,7 +144,7 @@ export default function HomeScreen() {
         <NextDoseCard
           doseText={
             nextDose
-              ? `Next Dose: ${nextDose.name} @ ${format(
+              ? `Next Dose: ${nextDose.group.name} @ ${format(
                   new Date(nextDose.time),
                   "h:mm a"
                 )}`
@@ -151,9 +163,9 @@ export default function HomeScreen() {
               time={time}
               meds={groupedByTime[time]}
               onEdit={(name) => {
-                const group = userDoses.filter((d) => d.name === name);
-                if (group.length > 0) {
-                  setEditingGroup(group);
+                const found = userDoses.find((d) => d.group.name === name);
+                if (found?.group) {
+                  setEditingGroup(found.group);
                   setShowAddModal(true);
                 }
               }}

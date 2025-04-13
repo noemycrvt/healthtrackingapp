@@ -1,7 +1,7 @@
 export interface MedicationDose {
-    id: string;
-    name: string;
-    details: string;
-    time: string; // formatted "HH:mm"
-    repeatDays: number[]; // 0 = Sunday ... 6 = Saturday
-  }
+  id: string;
+  date: string; // "yyyy-MM-dd"
+  time: string; // ISO string — full datetime
+  status: "pending" | "taken" | "missed";
+  createdAt: string; // ISO string
+}

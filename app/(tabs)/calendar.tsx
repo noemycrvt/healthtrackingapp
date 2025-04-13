@@ -3,8 +3,9 @@ import { View, Text } from 'react-native';
 import { Agenda } from 'react-native-calendars';
 import { useRouter } from 'expo-router';
 import { auth, db } from '../../firebaseConfig';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { MedicationDose } from '../../types/MedicationDose';
+import { MedicationGroup } from '../../types/MedicationGroup';
 import { format } from 'date-fns';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -64,30 +65,37 @@ export default function CalendarScreen() {
       const fetchCalendarData = async () => {
         const user = auth.currentUser;
         if (!user) return;
-  
-        const medsRef = collection(db, 'users', user.uid, 'medications');
-        const snapshot = await getDocs(medsRef);
-        const allDoses = snapshot.docs.map(doc => doc.data() as MedicationDose);
-  
+
+        const groupsRef = collection(db, "users", user.uid, "medicationGroups");
+        const groupSnap = await getDocs(groupsRef);
+        const groupList = groupSnap.docs.map((doc) => doc.data() as MedicationGroup);
+
         const calendarData: Record<string, any[]> = {};
-  
-        allDoses.forEach(dose => {
-          const dateKey = dose.date;
-          if (!calendarData[dateKey]) {
-            calendarData[dateKey] = [];
-          }
-          calendarData[dateKey].push({
-            name: dose.name,
-            details: dose.details,
-            time: format(new Date(dose.time), 'h:mm a'),
-            status: dose.status,
+
+        for (const group of groupList) {
+          const dosesRef = collection(db, "users", user.uid, "medicationGroups", group.id, "doses");
+          const q = query(dosesRef, orderBy("time"));
+          const snapshot = await getDocs(q);
+          const doses = snapshot.docs.map((doc) => doc.data() as MedicationDose);
+
+          doses.forEach((dose) => {
+            const dateKey = dose.date;
+            if (!calendarData[dateKey]) {
+              calendarData[dateKey] = [];
+            }
+            calendarData[dateKey].push({
+              name: group.name,
+              details: group.details,
+              time: format(new Date(dose.time), "h:mm a"),
+              status: dose.status,
+            });
           });
-        });
-  
+        }
+
         setAllItems(calendarData);
         setVisibleItems({ [selectedDate]: calendarData[selectedDate] || [] });
       };
-  
+
       fetchCalendarData();
     }, [selectedDate])
   );
