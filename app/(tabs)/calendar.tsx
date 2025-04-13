@@ -6,6 +6,7 @@ import { auth, db } from '../../firebaseConfig';
 import { collection, getDocs } from 'firebase/firestore';
 import { MedicationDose } from '../../types/MedicationDose';
 import { format } from 'date-fns';
+import { useFocusEffect } from '@react-navigation/native';
 
 function getOrdinalSuffix(dayNumber: number) {
   if (dayNumber % 100 >= 11 && dayNumber % 100 <= 13) return 'th';
@@ -58,37 +59,38 @@ export default function CalendarScreen() {
   const [allItems, setAllItems] = useState<Record<string, any[]>>({});
   const [visibleItems, setVisibleItems] = useState<Record<string, any[]>>({});
 
-  useEffect(() => {
-    const fetchCalendarData = async () => {
-      const user = auth.currentUser;
-      if (!user) return;
-
-      const medsRef = collection(db, 'users', user.uid, 'medications');
-      const snapshot = await getDocs(medsRef);
-      const allDoses = snapshot.docs.map(doc => doc.data() as MedicationDose);
-
-      const calendarData: Record<string, any[]> = {};
-
-      allDoses.forEach(dose => {
-        const dateKey = dose.date;
-        if (!calendarData[dateKey]) {
-          calendarData[dateKey] = [];
-        }
-        calendarData[dateKey].push({
-          name: dose.name,
-          details: dose.details,
-          time: format(new Date(dose.time), 'h:mm a'),
-          status: dose.status,
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchCalendarData = async () => {
+        const user = auth.currentUser;
+        if (!user) return;
+  
+        const medsRef = collection(db, 'users', user.uid, 'medications');
+        const snapshot = await getDocs(medsRef);
+        const allDoses = snapshot.docs.map(doc => doc.data() as MedicationDose);
+  
+        const calendarData: Record<string, any[]> = {};
+  
+        allDoses.forEach(dose => {
+          const dateKey = dose.date;
+          if (!calendarData[dateKey]) {
+            calendarData[dateKey] = [];
+          }
+          calendarData[dateKey].push({
+            name: dose.name,
+            details: dose.details,
+            time: format(new Date(dose.time), 'h:mm a'),
+            status: dose.status,
+          });
         });
-      });
-
-      setAllItems(calendarData);
-      // ✅ Initially filter to today only
-      setVisibleItems({ [selectedDate]: calendarData[selectedDate] || [] });
-    };
-
-    fetchCalendarData();
-  }, []);
+  
+        setAllItems(calendarData);
+        setVisibleItems({ [selectedDate]: calendarData[selectedDate] || [] });
+      };
+  
+      fetchCalendarData();
+    }, [selectedDate])
+  );
 
   const handleDayPress = (day: any) => {
     const date = day.dateString;
