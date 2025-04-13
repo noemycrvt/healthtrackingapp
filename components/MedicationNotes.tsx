@@ -47,6 +47,7 @@ export function useMedicationNotes() {
     setIsAdding,
     addCustomEffect,
     deleteEffect,
+    setSelectedEffects,
   };
 }
 
