@@ -13,27 +13,23 @@ import uuid from "react-native-uuid";
 import { MedicationDose } from "../types/MedicationDose";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from 'react-native-toast-message';
-import { db, auth } from '../firebaseConfig';
-import { collection, addDoc } from 'firebase/firestore';
-import TimePickerModal from "./TimePickerModal";
+import { db, auth } from '../firebaseConfig'; // 🔹 import auth
+import { doc, collection, addDoc } from 'firebase/firestore'; // 🔹 same as before
 
 const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 interface Props {
   onClose: () => void;
   onSave: (dose: MedicationDose) => void;
+  existingDose?: MedicationDose;
 }
 
 export default function AddDoseModal({ onClose, onSave }: Props) {
   const [name, setName] = useState("");
   const [details, setDetails] = useState("");
-  const [times, setTimes] = useState<Date[]>([]);
+  const [time, setTime] = useState(new Date());
   const [repeatDays, setRepeatDays] = useState<number[]>([]);
-  const [endDate, setEndDate] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
-  const [activeTimeIndex, setActiveTimeIndex] = useState<number | null>(null);
 
   const toggleDay = (index: number) => {
     setRepeatDays((prev) =>
@@ -46,50 +42,60 @@ export default function AddDoseModal({ onClose, onSave }: Props) {
 
     setIsSaving(true);
     Toast.hide();
+
+    const updatedDose: MedicationDose = {
+        id: existingDose?.id || uuid.v4().toString(),
+        name,
+        details,
+        time: time.toISOString(),
+        repeatDays,
+      };
+  
+      try {
+        const user = auth.currentUser;
+        if (!user) throw new Error("User not logged in");
+  
+        const userMedsRef = collection(db, "users", user.uid, "medications");
+  
+        if (existingDose) {
+          const doseDocRef = doc(userMedsRef, existingDose.id);
+          await updateDoc(doseDocRef, {
+            name,
+            details,
+            time: time.toISOString(),
+            repeatDays,
+          });
+        } else {
+          await addDoc(userMedsRef, updatedDose);
+        }
+
     Toast.show({
       type: 'info',
       text1: `Saving recurring schedule for: ${name}`,
     });
 
-    const user = auth.currentUser;
-    if (!user) {
-      Toast.show({ type: 'error', text1: 'User not logged in' });
-      return;
-    }
+    const newDose = {
+      id: uuid.v4().toString(),
+      name,
+      details,
+      time: time.toISOString(),
+      repeatDays,
+    };
 
-    const medicationId = uuid.v4().toString();
-    const doses: MedicationDose[] = [];
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("User not logged in");
 
-    let currentDate = new Date();
-    const finalDate = new Date(endDate);
+      const userMedsRef = collection(db, 'users', user.uid, 'medications');
+      await addDoc(userMedsRef, newDose);
 
-    while (currentDate <= finalDate) {
-      const isRepeatDay = repeatDays.includes(currentDate.getDay());
-
-      if (isRepeatDay) {
-        times.forEach((t) => {
-          const doseDateTime = new Date(
-            currentDate.getFullYear(),
-            currentDate.getMonth(),
-            currentDate.getDate(),
-            t.getHours(),
-            t.getMinutes()
-          );
-
-          doses.push({
-            id: uuid.v4().toString(),
-            medicationId,
-            name,
-            details,
-            time: doseDateTime.toISOString(),
-            date: format(doseDateTime, 'yyyy-MM-dd'),
-            status: 'pending',
-            createdAt: new Date().toISOString(),
-          });
-        });
-      }
-
-      currentDate = addDays(currentDate, 1);
+      onSave(newDose);
+    } catch (error) {
+      console.error("Failed to save dose to Firestore:", error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error saving medication',
+      });
     }
 
     try {
@@ -114,7 +120,9 @@ export default function AddDoseModal({ onClose, onSave }: Props) {
       <ScrollView className="flex-1 px-5"
         contentContainerStyle={{ paddingTop: Platform.OS === "ios" ? 60 : 40 }}
       >
-        <Text className="text-2xl font-bold mb-6 text-center">Add Medication</Text>
+        <Text className="text-2xl font-bold mb-6 text-center">
+            {existingDose ? "Edit Medication" : "Add Medication"}
+        </Text>
 
         {/* Name */}
         <View className="mb-5">
