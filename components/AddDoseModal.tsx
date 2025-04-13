@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -25,7 +25,10 @@ import {
 } from "firebase/firestore";
 import TimePickerModal from "./TimePickerModal";
 import { MedicationDose } from "../types/MedicationDose";
-import { MedicationGroup } from "../types/MedicationGroup";
+import { SafeAreaView } from "react-native-safe-area-context";
+import Toast from 'react-native-toast-message';
+import { db, auth } from '../firebaseConfig';
+import { collection, addDoc } from 'firebase/firestore';
 
 const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -58,6 +61,10 @@ export default function AddDoseModal({ onClose, onSave, medicationGroup }: Props
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [activeTimeIndex, setActiveTimeIndex] = useState<number | null>(null);
 
+  useEffect(() => {
+    requestNotificationPermissions();
+  }, []);
+
   const toggleDay = (index: number) => {
     setRepeatDays((prev) =>
       prev.includes(index) ? prev.filter((d) => d !== index) : [...prev, index]
@@ -76,94 +83,41 @@ export default function AddDoseModal({ onClose, onSave, medicationGroup }: Props
       Toast.show({ type: "error", text1: "User not logged in" });
       return;
     }
-  
+
+    const parsedDoses = parseInt(totalDoses, 10);
+    const medicationId = uuid.v4().toString(); // ✅ shared ID for all generated doses
+    const doses: MedicationDose[] = [];
+    let currentDate = new Date();
+
+    while (doses.length < parsedDoses) {
+      if (repeatDays.includes(currentDate.getDay())) {
+        const doseDateTime = new Date(
+          currentDate.getFullYear(),
+          currentDate.getMonth(),
+          currentDate.getDate(),
+          time.getHours(),
+          time.getMinutes()
+        );
+
+        doses.push({
+          id: uuid.v4().toString(),
+          medicationId,
+          name,
+          details,
+          time: doseDateTime.toISOString(),
+          date: format(doseDateTime, 'yyyy-MM-dd'),
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+        });
+      }
+      currentDate = addDays(currentDate, 1);
+    }
+
     try {
-      const now = new Date();
-      const groupId = isEditing && medicationGroup
-        ? medicationGroup.id
-        : uuid.v4().toString();
-  
-      const groupRef = doc(db, "users", user.uid, "medicationGroups", groupId);
-  
-      const groupData: MedicationGroup = {
-        id: groupId,
-        name,
-        details,
-        startDate: format(new Date(), "yyyy-MM-dd"),
-        endDate: format(endDate, "yyyy-MM-dd"),
-        times: times.map((t) => format(t, "HH:mm")),
-        repeatDays,
-        createdAt: new Date().toISOString(),
-      };
-  
-      await setDoc(groupRef, groupData, { merge: true });
-  
-      const doseCollectionRef = collection(
-        db,
-        "users",
-        user.uid,
-        "medicationGroups",
-        groupId,
-        "doses"
-      );
-  
-      // If editing: delete future doses
-      if (isEditing) {
-        const snapshot = await getDocs(doseCollectionRef);
-        const deletions = snapshot.docs.map((docSnap) => {
-          const data = docSnap.data() as MedicationDose;
-          const doseTime = new Date(data.time);
-        
-          if (
-            isAfter(doseTime, now) &&
-            data.status === "pending"
-          ) {
-            return deleteDoc(docSnap.ref);
-          }
-          return null;
-        });        await Promise.all(deletions.filter(Boolean));
-      }
-  
-      // Generate new doses
-      const doses: MedicationDose[] = [];
-      let currentDate = new Date();
-      const finalDate = new Date(endDate);
-  
-      while (currentDate <= finalDate) {
-        if (repeatDays.includes(currentDate.getDay())) {
-          times.forEach((t) => {
-            const doseDateTime = new Date(
-              currentDate.getFullYear(),
-              currentDate.getMonth(),
-              currentDate.getDate(),
-              t.getHours(),
-              t.getMinutes()
-            );
-  
-            if (isAfter(doseDateTime, now)) {
-              doses.push({
-                id: uuid.v4().toString(),
-                date: format(doseDateTime, "yyyy-MM-dd"),
-                time: doseDateTime.toISOString(),
-                status: "pending",
-                createdAt: new Date().toISOString(),
-              });
-            }
-          });
-        }
-  
-        currentDate = addDays(currentDate, 1);
-      }
-  
-      await Promise.all(doses.map((dose) => addDoc(doseCollectionRef, dose)));
-  
-      Toast.show({
-        type: "success",
-        text1: isEditing ? "Medication group updated" : "Medication saved!",
-      });
-  
-      // ✅ Only call these after everything is synced
-      onSave();
+      const userMedRef = collection(db, 'users', user.uid, 'medications');
+      await Promise.all(doses.map(dose => addDoc(userMedRef, dose)));
+      doses.forEach(onSave); // locally push each one
+      Toast.show({ type: 'success', text1: 'Medication saved!' });
       onClose();
   
     } catch (error) {
@@ -389,15 +343,3 @@ export default function AddDoseModal({ onClose, onSave, medicationGroup }: Props
         onChange={(selected) => {
           if (activeTimeIndex !== null) {
             const updated = [...times];
-            updated[activeTimeIndex] = selected;
-            setTimes(updated);
-          }
-        }}
-        onClose={() => {
-          setModalVisible(false);
-          setActiveTimeIndex(null);
-        }}
-      />
-    </SafeAreaView>
-  );
-}
