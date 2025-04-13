@@ -14,7 +14,7 @@ import { MedicationDose } from "../types/MedicationDose";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from 'react-native-toast-message';
 import { db, auth } from '../firebaseConfig'; // 🔹 import auth
-import { doc, collection, addDoc } from 'firebase/firestore'; // 🔹 same as before
+import { doc, collection, addDoc, updateDoc } from 'firebase/firestore'; // 🔹 same as before
 
 const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -24,12 +24,13 @@ interface Props {
   existingDose?: MedicationDose;
 }
 
-export default function AddDoseModal({ onClose, onSave }: Props) {
-  const [name, setName] = useState("");
-  const [details, setDetails] = useState("");
-  const [time, setTime] = useState(new Date());
-  const [repeatDays, setRepeatDays] = useState<number[]>([]);
+export default function AddDoseModal({ onClose, onSave, existingDose }: Props) {
+  const [name, setName] = useState(existingDose?.name || "");
+  const [details, setDetails] = useState(existingDose?.details || "");
+  const [time, setTime] = useState(existingDose ? new Date(existingDose.time) : new Date());
+  const [repeatDays, setRepeatDays] = useState<number[]>(existingDose?.repeatDays || []);
   const [isSaving, setIsSaving] = useState(false);
+  
 
   const toggleDay = (index: number) => {
     setRepeatDays((prev) =>
@@ -74,28 +75,13 @@ export default function AddDoseModal({ onClose, onSave }: Props) {
       text1: `Saving recurring schedule for: ${name}`,
     });
 
-    const newDose = {
-      id: uuid.v4().toString(),
-      name,
-      details,
-      time: time.toISOString(),
-      repeatDays,
-    };
-
-    try {
-      const user = auth.currentUser;
-      if (!user) throw new Error("User not logged in");
-
-      const userMedsRef = collection(db, 'users', user.uid, 'medications');
-      await addDoc(userMedsRef, newDose);
-
-      onSave(newDose);
+    onSave(updatedDose);
     } catch (error) {
-      console.error("Failed to save dose to Firestore:", error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error saving medication',
-      });
+        console.error("Failed to save dose to Firestore:", error);
+        Toast.show({
+            type: "error",
+            text1: "Error saving medication",
+        });
     }
 
     try {
