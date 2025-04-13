@@ -32,6 +32,7 @@ export default function HomeScreen() {
   const { userName, loadingUser } = useContext(UserContext);
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingDose, setEditingDose] = useState<MedicationDose | null>(null);
   const [userDoses, setUserDoses] = useState<MedicationDose[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(true);
@@ -131,7 +132,20 @@ export default function HomeScreen() {
           <Text className="text-base mt-2">No scheduled medications today.</Text>
         ) : (
           sortedTimes.map((time) => (
-            <MedScheduleCard key={time} time={time} meds={groupedByTime[time]} />
+            <MedScheduleCard
+              key={time}
+              time={time}
+              meds={groupedByTime[time]}
+              onEdit={(name) => {
+                const doseToEdit = userDoses.find((d) => d.name === name);
+                if (doseToEdit) {
+                  setEditingDose(doseToEdit);
+                  setShowAddModal(true);
+                }
+              }}
+              onDelete={(name) => console.log("Delete", name)}
+              onMarkTaken={(name) => console.log("Taken", name)}
+            />
           ))
         )}
       </ScrollView>
@@ -140,8 +154,21 @@ export default function HomeScreen() {
 
       <Modal visible={showAddModal} animationType="slide">
         <AddDoseModal
-          onClose={() => setShowAddModal(false)}
-          onSave={(dose) => setUserDoses((prev) => [...prev, dose])}
+          existingDose={editingDose || undefined}
+          onClose={() => {
+            setShowAddModal(false);
+            setEditingDose(null);
+          }}
+          onSave={(dose) => {
+            setUserDoses((prev) => {
+              const exists = prev.find((d) => d.id === dose.id);
+              return exists
+                ? prev.map((d) => (d.id === dose.id ? dose : d))
+                : [...prev, dose];
+            });
+            setEditingDose(null);
+            setShowAddModal(false);
+          }}
         />
       </Modal>
     </View>
