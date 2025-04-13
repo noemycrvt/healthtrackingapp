@@ -21,6 +21,7 @@ import {
   doc,
   updateDoc,
   setDoc,
+  deleteDoc
 } from "firebase/firestore";
 import TimePickerModal from "./TimePickerModal";
 import { MedicationDose } from "../types/MedicationDose";
@@ -37,14 +38,18 @@ export default function AddDoseModal({ onClose, onSave, medicationGroup }: Props
 
   const [name, setName] = useState(medicationGroup?.name || "");
   const [details, setDetails] = useState(medicationGroup?.details || "");
-  const [times, setTimes] = useState<Date[]>(
-    medicationGroup?.times.map(t => {
-      const [h, m] = t.split(":").map(Number);
-      const date = new Date();
-      date.setHours(h, m, 0, 0);
-      return date;
-    }) || []
-  );
+  const [times, setTimes] = useState<Date[]>(() => {
+    if (!medicationGroup?.times) return [];
+    return medicationGroup.times
+      .map((t) => {
+        const [hour, minute] = t.split(":").map(Number);
+        const date = new Date();
+        date.setHours(hour, minute, 0, 0);
+        return date;
+      })
+      .sort((a, b) => a.getTime() - b.getTime());
+  });
+
   const [endDate, setEndDate] = useState<Date | null>(
     medicationGroup?.endDate ? new Date(medicationGroup.endDate) : null
   );
@@ -101,7 +106,7 @@ export default function AddDoseModal({ onClose, onSave, medicationGroup }: Props
         const deletions = snapshot.docs.map((docSnap) => {
           const data = docSnap.data() as MedicationDose;
           if (isAfter(new Date(data.time), now)) {
-            return docSnap.ref.delete();
+            return deleteDoc(docSnap.ref); // 👈 fixed here
           }
           return null;
         });

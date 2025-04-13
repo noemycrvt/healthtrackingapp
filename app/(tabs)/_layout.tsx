@@ -4,7 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import Toast from 'react-native-toast-message';
 import { Pressable, View, Modal, Text, Button } from 'react-native';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth, db } from '../../firebaseConfig';
+import { auth, db } from '../../firebaseConfig'; // adjust path if needed
 import { doc, getDoc } from 'firebase/firestore';
 
 export default function TabLayout() {
@@ -12,23 +12,24 @@ export default function TabLayout() {
   const [userName, setUserName] = useState('');
 
   useEffect(() => {
+    let isMounted = true;
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         router.replace('/(auth)/account');
-      } else {
-        try {
-          const docRef = doc(db, 'users', user.uid);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            setUserName(docSnap.data().name || '');
-          }
-        } catch (err) {
-          console.warn('Failed to fetch user profile:', err);
+      } else if (isMounted) {
+        const docRef = doc(db, 'users', user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setUserName(docSnap.data().name || '');
         }
       }
     });
 
-    return unsubscribe;
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   const logout = async () => {
@@ -138,7 +139,7 @@ export default function TabLayout() {
                 textAlign: 'center',
               }}
             >
-              Hi, {userName || 'Guest'}!
+              Hi, {userName}!
             </Text>
             <View style={{ width: '100%', marginBottom: 10 }}>
               <Button title="LOGOUT" onPress={logout} color="#6699FF" />

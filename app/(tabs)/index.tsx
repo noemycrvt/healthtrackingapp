@@ -162,15 +162,15 @@ export default function HomeScreen() {
               key={time}
               time={time}
               meds={groupedByTime[time]}
-              onEdit={(name) => {
-                const found = userDoses.find((d) => d.group.name === name);
+              onEdit={(groupId) => {
+                const found = userDoses.find((d) => d.group.id === groupId);
                 if (found?.group) {
                   setEditingGroup(found.group);
                   setShowAddModal(true);
                 }
               }}
-              onDelete={(name) => console.log("Delete", name)}
-              onMarkTaken={(name) => console.log("Taken", name)}
+              onDelete={(groupId) => console.log("Delete group:", groupId)}
+              onMarkTaken={(groupId) => console.log("Mark taken for group:", groupId)}
             />
           ))
         )}
