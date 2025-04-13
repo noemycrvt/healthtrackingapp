@@ -36,29 +36,29 @@ export default function HomeScreen() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(true);
 
-  const weekdayIndex = new Date().getDay();
+  const todayStr = format(new Date(), "yyyy-MM-dd"); // 🔧 Get today's date string
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         router.replace("/account");
       } else {
-        await fetchUserDoses(user.uid); // ✅ Fetch data after confirming auth
+        await fetchUserDoses(user.uid);
       }
       setLoading(false);
     });
 
     return unsubscribe;
-  }, [showAddModal]); // rerun after adding new dose
+  }, [showAddModal]);
 
   const fetchUserDoses = async (uid: string) => {
     try {
       const medsRef = collection(db, "users", uid, "medications");
       const snapshot = await getDocs(medsRef);
       const all = snapshot.docs.map((doc) => doc.data() as MedicationDose);
-      const todayFiltered = all.filter((d) =>
-        d.repeatDays.includes(new Date().getDay())
-      );
+
+      // 🔧 Filter by date, not repeatDays
+      const todayFiltered = all.filter((d) => d.date === todayStr);
       setUserDoses(todayFiltered);
     } catch (error) {
       console.error("Error fetching user medications:", error);
@@ -69,15 +69,10 @@ export default function HomeScreen() {
     const interval = setInterval(() => {
       setCurrentTime(new Date());
     }, 60000);
-
     return () => clearInterval(interval);
   }, []);
 
-  const todayDoses = userDoses.filter((dose) =>
-    dose.repeatDays.includes(weekdayIndex)
-  );
-
-  const groupedByTime = todayDoses.reduce((acc, curr) => {
+  const groupedByTime = userDoses.reduce((acc, curr) => {
     const formattedTime = format(new Date(curr.time), "h:mm a");
     if (!acc[formattedTime]) acc[formattedTime] = [];
     acc[formattedTime].push({ name: curr.name, details: curr.details });
@@ -88,13 +83,14 @@ export default function HomeScreen() {
 
   const getNextDose = () => {
     const now = new Date();
-    const upcoming = todayDoses
+
+    const upcoming = userDoses
       .map((dose) => ({
         ...dose,
-        date: new Date(dose.time),
+        dateObj: new Date(dose.time),
       }))
-      .filter((dose) => dose.date > now)
-      .sort((a, b) => a.date.getTime() - b.date.getTime());
+      .filter((dose) => dose.dateObj > now)
+      .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
 
     return upcoming[0];
   };

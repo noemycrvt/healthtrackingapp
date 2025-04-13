@@ -3,19 +3,18 @@ import {
   View,
   Text,
   TextInput,
-  Button,
   Pressable,
   ScrollView,
   Platform
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { format } from "date-fns";
+import { addDays, format } from "date-fns";
 import uuid from "react-native-uuid";
 import { MedicationDose } from "../types/MedicationDose";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from 'react-native-toast-message';
-import { db, auth } from '../firebaseConfig'; // 🔹 import auth
-import { doc, collection, addDoc } from 'firebase/firestore'; // 🔹 same as before
+import { db, auth } from '../firebaseConfig';
+import { collection, addDoc } from 'firebase/firestore';
 
 const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -29,6 +28,7 @@ export default function AddDoseModal({ onClose, onSave }: Props) {
   const [details, setDetails] = useState("");
   const [time, setTime] = useState(new Date());
   const [repeatDays, setRepeatDays] = useState<number[]>([]);
+  const [totalDoses, setTotalDoses] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
 
   const toggleDay = (index: number) => {
@@ -38,48 +38,65 @@ export default function AddDoseModal({ onClose, onSave }: Props) {
   };
 
   const handleSave = async () => {
-    if (isSaving) return;
-
+    if (isSaving || !totalDoses) return;
     setIsSaving(true);
 
     Toast.hide();
     Toast.show({
       type: 'info',
-      text1: `Saved: ${name}`,
-      text2: `${details} at ${format(time, 'h:mm a')}`,
+      text1: `Saving ${totalDoses} doses for: ${name}`,
     });
 
-    const newDose = {
-      id: uuid.v4().toString(),
-      name,
-      details,
-      time: time.toISOString(),
-      repeatDays,
-    };
-
-    try {
-      const user = auth.currentUser;
-      if (!user) throw new Error("User not logged in");
-
-      const userMedsRef = collection(db, 'users', user.uid, 'medications');
-      await addDoc(userMedsRef, newDose);
-
-      onSave(newDose);
-    } catch (error) {
-      console.error("Failed to save dose to Firestore:", error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error saving medication',
-      });
+    const user = auth.currentUser;
+    if (!user) {
+      Toast.show({ type: 'error', text1: 'User not logged in' });
+      return;
     }
 
-    setTimeout(() => {
+    const parsedDoses = parseInt(totalDoses, 10);
+    const medicationId = uuid.v4().toString(); // ✅ shared ID for all generated doses
+    const doses: MedicationDose[] = [];
+    let currentDate = new Date();
+
+    while (doses.length < parsedDoses) {
+      if (repeatDays.includes(currentDate.getDay())) {
+        const doseDateTime = new Date(
+          currentDate.getFullYear(),
+          currentDate.getMonth(),
+          currentDate.getDate(),
+          time.getHours(),
+          time.getMinutes()
+        );
+
+        doses.push({
+          id: uuid.v4().toString(),
+          medicationId,
+          name,
+          details,
+          time: doseDateTime.toISOString(),
+          date: format(doseDateTime, 'yyyy-MM-dd'),
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+        });
+      }
+      currentDate = addDays(currentDate, 1);
+    }
+
+    try {
+      const userMedRef = collection(db, 'users', user.uid, 'medications');
+      await Promise.all(doses.map(dose => addDoc(userMedRef, dose)));
+      doses.forEach(onSave); // locally push each one
+      Toast.show({ type: 'success', text1: 'Medication saved!' });
       onClose();
+    } catch (error) {
+      console.error("Failed to save dose(s):", error);
+      Toast.show({ type: 'error', text1: 'Failed to save medication' });
+    } finally {
       setIsSaving(false);
-    }, 300);
+    }
   };
 
-  const isFormValid = name && details && repeatDays.length > 0;
+  const isFormValid = name && details && repeatDays.length > 0 && totalDoses;
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -146,6 +163,17 @@ export default function AddDoseModal({ onClose, onSave }: Props) {
               </Pressable>
             ))}
           </View>
+        </View>
+
+        <View className="mb-5">
+          <Text className="text-base font-semibold mb-1">Total Doses</Text>
+          <TextInput
+            className="border rounded px-3 py-2"
+            placeholder="e.g. 10"
+            keyboardType="numeric"
+            value={totalDoses}
+            onChangeText={setTotalDoses}
+          />
         </View>
 
         <View className="flex-row justify-between items-center mb-10">
