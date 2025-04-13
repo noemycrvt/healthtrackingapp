@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from 'react-native-toast-message';
 import { db, auth } from '../firebaseConfig';
 import { collection, addDoc } from 'firebase/firestore';
+import { requestNotificationPermissions } from "../app/data/notification";
+import * as Notifications from 'expo-notifications';
 
 const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -30,6 +32,10 @@ export default function AddDoseModal({ onClose, onSave }: Props) {
   const [repeatDays, setRepeatDays] = useState<number[]>([]);
   const [totalDoses, setTotalDoses] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    requestNotificationPermissions();
+  }, []);
 
   const toggleDay = (index: number) => {
     setRepeatDays((prev) =>
@@ -78,7 +84,17 @@ export default function AddDoseModal({ onClose, onSave }: Props) {
           status: 'pending',
           createdAt: new Date().toISOString(),
         });
-      }
+
+         // Schedule local notification
+        await Notifications.scheduleNotificationAsync({
+          content: {
+          title: `Time to take ${name}`,
+          body: details,
+          sound: true,
+      },
+      trigger: doseDateTime,
+    });
+    }
       currentDate = addDays(currentDate, 1);
     }
 
