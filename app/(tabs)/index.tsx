@@ -8,7 +8,8 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "../../firebaseConfig";
+import { auth, db } from "../../firebaseConfig";
+import { collection, getDocs } from "firebase/firestore";
 
 import { UserContext } from "../../context/UserContext";
 import FloatingButton from "../../components/FloatingButton";
@@ -19,7 +20,6 @@ import AffirmationCard from "../../components/AffirmationCard";
 import { MedicationDose } from "../../types/MedicationDose";
 import { format } from "date-fns";
 
-// Get greeting based on current hour
 const getTimeGreeting = () => {
   const hour = new Date().getHours();
   if (hour < 12) return "Good morning";
@@ -39,20 +39,36 @@ export default function HomeScreen() {
   const weekdayIndex = new Date().getDay();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         router.replace("/account");
+      } else {
+        await fetchUserDoses(user.uid); // ✅ Fetch data after confirming auth
       }
       setLoading(false);
     });
 
     return unsubscribe;
-  }, []);
+  }, [showAddModal]); // rerun after adding new dose
+
+  const fetchUserDoses = async (uid: string) => {
+    try {
+      const medsRef = collection(db, "users", uid, "medications");
+      const snapshot = await getDocs(medsRef);
+      const all = snapshot.docs.map((doc) => doc.data() as MedicationDose);
+      const todayFiltered = all.filter((d) =>
+        d.repeatDays.includes(new Date().getDay())
+      );
+      setUserDoses(todayFiltered);
+    } catch (error) {
+      console.error("Error fetching user medications:", error);
+    }
+  };
 
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(new Date());
-    }, 60000); // refresh every 60 seconds
+    }, 60000);
 
     return () => clearInterval(interval);
   }, []);
