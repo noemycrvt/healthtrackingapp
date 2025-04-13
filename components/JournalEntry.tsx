@@ -1,16 +1,25 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
 import { useMedicationNotes } from './MedicationNotes';
+import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
+import { db, auth } from '../firebaseConfig';
 
-export default function JournalEntry({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) {
-  const [journalEntry, setJournalEntry] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
-  const [moodRating, setMoodRating] = useState(3);
-  const [painRating, setPainRating] = useState(2);
-  const [energyRating, setEnergyRating] = useState(4);
-  const [anxietyRating, setAnxietyRating] = useState(3);
+interface Props {
+  onSave: () => void;
+  onCancel: () => void;
+  existingEntry?: any;
+  isEditMode?: boolean;
+}
+
+export default function JournalEntry({ onSave, onCancel, existingEntry, isEditMode = true }: Props) {
+  const [journalEntry, setJournalEntry] = useState(existingEntry?.journalEntry || '');
+  const [isEditing, setIsEditing] = useState(isEditMode);
+  const [moodRating, setMoodRating] = useState(existingEntry?.moodRating ?? 3);
+  const [painRating, setPainRating] = useState(existingEntry?.painRating ?? 2);
+  const [energyRating, setEnergyRating] = useState(existingEntry?.energyRating ?? 4);
+  const [anxietyRating, setAnxietyRating] = useState(existingEntry?.anxietyRating ?? 3);
 
   const {
     selectedEffects,
@@ -24,7 +33,13 @@ export default function JournalEntry({ onSave, onCancel }: { onSave: () => void;
     setIsAdding,
     addCustomEffect,
     deleteEffect,
+    setSelectedEffects,
   } = useMedicationNotes();
+
+  useEffect(() => {
+    if (existingEntry?.selectedEffects) setSelectedEffects(existingEntry.selectedEffects);
+    if (existingEntry?.effectiveness) setEffectiveness(existingEntry.effectiveness);
+  }, [existingEntry]);
 
   const moodEmojis = ['😞', '😔', '😐', '🙂', '😊'];
   const painEmojis = ['😊', '🙂', '😐', '😔', '😞'];
@@ -34,6 +49,34 @@ export default function JournalEntry({ onSave, onCancel }: { onSave: () => void;
     month: 'long',
     day: 'numeric'
   });
+
+  const handleSave = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const data = {
+      date: existingEntry?.date || new Date().toISOString(),
+      journalEntry,
+      moodRating,
+      painRating,
+      energyRating,
+      anxietyRating,
+      selectedEffects,
+      effectiveness,
+    };
+
+    try {
+      if (existingEntry?.id) {
+        const ref = doc(db, 'users', user.uid, 'journalEntries', existingEntry.id);
+        await updateDoc(ref, data);
+      } else {
+        await addDoc(collection(db, 'users', user.uid, 'journalEntries'), data);
+      }
+      onSave();
+    } catch (e) {
+      console.error("Save failed", e);
+    }
+  };
 
   return (
     <ScrollView className="flex-1 px-4 pt-16" showsVerticalScrollIndicator={false}>
@@ -52,7 +95,7 @@ export default function JournalEntry({ onSave, onCancel }: { onSave: () => void;
             <Text className="text-sm font-medium">Mood</Text>
             <Text className="text-2xl">{moodEmojis[moodRating]}</Text>
           </View>
-          <Slider style={{ width: '100%' }} minimumValue={0} maximumValue={4} step={1} value={moodRating} onValueChange={setMoodRating} />
+          <Slider style={{ width: '100%' }} minimumValue={0} maximumValue={4} step={1} value={moodRating} onValueChange={setMoodRating} disabled={!isEditing} />
           <View className="flex-row justify-between text-xs">
             <Text className="text-xs text-gray-500">Low</Text>
             <Text className="text-xs text-gray-500">High</Text>
@@ -65,7 +108,7 @@ export default function JournalEntry({ onSave, onCancel }: { onSave: () => void;
             <Text className="text-sm font-medium">Pain Level</Text>
             <Text className="text-2xl">{painEmojis[painRating]}</Text>
           </View>
-          <Slider style={{ width: '100%' }} minimumValue={0} maximumValue={4} step={1} value={painRating} onValueChange={setPainRating} />
+          <Slider style={{ width: '100%' }} minimumValue={0} maximumValue={4} step={1} value={painRating} onValueChange={setPainRating} disabled={!isEditing} />
           <View className="flex-row justify-between">
             <Text className="text-xs text-gray-500">None</Text>
             <Text className="text-xs text-gray-500">Severe</Text>
@@ -80,7 +123,7 @@ export default function JournalEntry({ onSave, onCancel }: { onSave: () => void;
               <View className="bg-blue-500 h-5" style={{ width: `${(energyRating / 4) * 100}%` }} />
             </View>
           </View>
-          <Slider style={{ width: '100%' }} minimumValue={0} maximumValue={4} step={1} value={energyRating} onValueChange={setEnergyRating} />
+          <Slider style={{ width: '100%' }} minimumValue={0} maximumValue={4} step={1} value={energyRating} onValueChange={setEnergyRating} disabled={!isEditing} />
           <View className="flex-row justify-between">
             <Text className="text-xs text-gray-500">Low</Text>
             <Text className="text-xs text-gray-500">High</Text>
@@ -95,7 +138,7 @@ export default function JournalEntry({ onSave, onCancel }: { onSave: () => void;
               <View className="bg-yellow-500 h-5" style={{ width: `${(anxietyRating / 4) * 100}%` }} />
             </View>
           </View>
-          <Slider style={{ width: '100%' }} minimumValue={0} maximumValue={4} step={1} value={anxietyRating} onValueChange={setAnxietyRating} />
+          <Slider style={{ width: '100%' }} minimumValue={0} maximumValue={4} step={1} value={anxietyRating} onValueChange={setAnxietyRating} disabled={!isEditing} />
           <View className="flex-row justify-between">
             <Text className="text-xs text-gray-500">Low</Text>
             <Text className="text-xs text-gray-500">High</Text>
@@ -125,7 +168,7 @@ export default function JournalEntry({ onSave, onCancel }: { onSave: () => void;
             className="min-h-[150px] text-sm border border-gray-200 rounded p-2"
           />
         ) : journalEntry ? (
-          <Text className="text-sm">{journalEntry}</Text>
+          <Text className="text-sm whitespace-pre-line">{journalEntry}</Text>
         ) : (
           <View className="items-center justify-center py-8">
             <Ionicons name="create-outline" size={32} color="gray" />
@@ -143,17 +186,19 @@ export default function JournalEntry({ onSave, onCancel }: { onSave: () => void;
 
         {sideEffects.map((effect) => (
           <View key={effect} className="flex-row items-center justify-between bg-gray-100 p-3 mt-2 rounded-lg">
-            <Pressable onPress={() => toggleEffect(effect)} className="flex-row items-center gap-2">
+            <Pressable onPress={() => isEditing && toggleEffect(effect)} className="flex-row items-center gap-2">
               <View className={`w-4 h-4 border rounded ${selectedEffects.includes(effect) ? 'bg-blue-500 border-blue-500' : 'bg-white border-gray-400'}`} />
               <Text className="text-sm">{effect}</Text>
             </Pressable>
-            <Pressable onPress={() => deleteEffect(effect)}>
-              <Ionicons name="close-circle-outline" size={20} color="gray" />
-            </Pressable>
+            {isEditing && (
+              <Pressable onPress={() => deleteEffect(effect)}>
+                <Ionicons name="close-circle-outline" size={20} color="gray" />
+              </Pressable>
+            )}
           </View>
         ))}
 
-        {isAdding ? (
+        {isEditing && (isAdding ? (
           <View className="flex-row items-center mt-2 gap-2">
             <TextInput
               className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
@@ -173,13 +218,13 @@ export default function JournalEntry({ onSave, onCancel }: { onSave: () => void;
             <Ionicons name="add-outline" size={18} color="black" />
             <Text className="text-sm ml-2">Add Custom Side Effect</Text>
           </Pressable>
-        )}
+        ))}
 
         <View className="flex-row justify-between gap-2 mt-2">
           {['Not Working', 'Somewhat', 'Very Effective'].map((label) => (
             <Pressable
               key={label}
-              onPress={() => setEffectiveness(label)}
+              onPress={() => isEditing && setEffectiveness(label)}
               className={`flex-1 py-3 items-center border rounded-lg ${effectiveness === label ? 'border-blue-500 bg-blue-100' : 'border-gray-300'}`}
             >
               <Text>{label}</Text>
@@ -193,7 +238,10 @@ export default function JournalEntry({ onSave, onCancel }: { onSave: () => void;
         <Pressable onPress={onCancel} className="flex-1 py-3 bg-gray-200 rounded-lg items-center">
           <Text className="text-black">Cancel</Text>
         </Pressable>
-        <Pressable onPress={onSave} className="flex-1 py-3 bg-blue-500 rounded-lg items-center">
+        <Pressable
+          onPress={handleSave}
+          className="flex-1 py-3 bg-blue-500 rounded-lg items-center"
+        >
           <Text className="text-white">Save</Text>
         </Pressable>
       </View>
