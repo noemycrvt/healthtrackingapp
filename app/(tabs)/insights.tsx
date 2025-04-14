@@ -1,127 +1,121 @@
-import React, { useState, useEffect } from "react";
-import { ScrollView, Text, View, Dimensions, ActivityIndicator } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  ScrollView,
+  Text,
+  View,
+  Dimensions,
+  ActivityIndicator,
+} from "react-native";
 import { LineChart } from "react-native-chart-kit";
-import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { db, auth } from "../../firebaseConfig";
-import { format, subDays, parseISO, isWithinInterval, startOfDay, endOfDay } from "date-fns";
-import { useFocusEffect } from '@react-navigation/native';
-import { useCallback } from 'react';
-
+import { useFocusEffect } from "@react-navigation/native";
+import { format, parseISO } from "date-fns";
 
 const screenWidth = Dimensions.get("window").width;
 
 export default function InsightsScreen() {
-  const [medicationData, setMedicationData] = useState([]);
+  const [chartData, setChartData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   useFocusEffect(
     useCallback(() => {
-      fetchMedicationData();
+      fetchData();
     }, [])
-  );  
-  
-  const fetchMedicationData = async () => {
+  );
+
+  const fetchData = async () => {
+    setIsLoading(true);
+
     try {
-      setIsLoading(true);
-      
       const user = auth.currentUser;
       if (!user) {
         console.error("User not logged in");
-        setIsLoading(false);
         return;
       }
-      
-      const endDate = new Date();
-      const startDate = subDays(endDate, 6);
-      
-      const dateRange = [];
-      for (let i = 0; i < 7; i++) {
-        const date = subDays(endDate, i);
-        dateRange.unshift(format(date, "yyyy-MM-dd"));
+
+      const doses: any[] = [];
+      const journals: any[] = [];
+
+      // Get all doses from all medication groups
+      const groupsRef = collection(db, "users", user.uid, "medicationGroups");
+      const groupSnaps = await getDocs(groupsRef);
+
+      for (const groupDoc of groupSnaps.docs) {
+        const dosesRef = collection(db, "users", user.uid, "medicationGroups", groupDoc.id, "doses");
+        const doseSnaps = await getDocs(dosesRef);
+        doseSnaps.forEach((doc) => {
+          const data = doc.data();
+          if (data.date && data.status) {
+            doses.push(data);
+          }
+        });
       }
-      
-      const medsRef = collection(db, "users", user.uid, "medications");
-      const querySnapshot = await getDocs(medsRef);
-      
-      const allMedications = querySnapshot.docs.map(doc => {
+
+      // Get all journal entries
+      const journalRef = collection(db, "users", user.uid, "journalEntries");
+      const journalSnaps = await getDocs(journalRef);
+      journalSnaps.forEach((doc) => {
         const data = doc.data();
-        return {
-          id: data.id,
-          name: data.name,
-          time: data.time,
-          date: data.date,
-          status: data.status || "Pending",
-        };
+        if (data.date) journals.push(data);
       });
 
-        // Fetch Journal Entries 
-    const journalRef = collection(db, "users", user.uid, "journalEntries");
-    const journalSnapshot = await getDocs(journalRef);
-    const allJournals = journalSnapshot.docs.map(doc => doc.data());
-  
-    const processedData = dateRange.map(dateStr => {
-    const displayDate = format(parseISO(dateStr), "MMM d");
+      // Build a date map
+      const dateMap: Record<string, any> = {};
 
-      // Medication data
-      const medsForDay = allMedications.filter(med => med.date === dateStr);
-      const medsTaken = medsForDay.filter(med => med.status === "taken").length;
-      const medsPrescribed = medsForDay.length;
+      // Add medication stats
+      doses.forEach((dose) => {
+        const date = dose.date;
+        if (!dateMap[date]) dateMap[date] = { taken: 0, skipped: 0 };
+        if (dose.status === "taken") dateMap[date].taken += 1;
+        if (dose.status === "skipped") dateMap[date].skipped += 1;
+      });
 
+      // Add journal stats
+      journals.forEach((entry) => {
+        const date = format(new Date(entry.date), "yyyy-MM-dd");
+        if (!dateMap[date]) dateMap[date] = {};
+        const d = dateMap[date];
+        d.painRatings = [...(d.painRatings || []), entry.painRating ?? 0];
+        d.energyRatings = [...(d.energyRatings || []), entry.energyRating ?? 0];
+        d.anxietyRatings = [...(d.anxietyRatings || []), entry.anxietyRating ?? 0];
+        d.moodRatings = [...(d.moodRatings || []), entry.moodRating ?? 0];
+      });
 
-      // Journal data
-      const journalsForDay = allJournals.filter(entry => {
-      const entryDate = new Date(entry.date); 
-      return format(entryDate, "yyyy-MM-dd") === dateStr;
-    });
-  
-      
-      const avg = (values) =>
-        values.length ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : 0;
-      
-      return {
-        date: displayDate,
-        medsTaken,
-        medsPrescribed,
-        painLevel: avg(journalsForDay.map(j => j.painRating ?? 0)),
-        energyLevel: avg(journalsForDay.map(j => j.energyRating ?? 0)),
-        anxietyLevel: avg(journalsForDay.map(j => j.anxietyRating ?? 0)), 
-        moodLevel: avg(journalsForDay.map(j => j.moodRating ?? 0)),
-        };
-    });
+      // Turn dateMap into sorted array
+      const sorted = Object.entries(dateMap)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, stats]) => {
+          const total = (stats.taken || 0) + (stats.skipped || 0);
+          const adherence = total > 0 ? Math.round((stats.taken / total) * 100) : 0;
 
-    setMedicationData(processedData);
+          const avg = (arr: number[]) =>
+            arr && arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
+
+          return {
+            date: format(parseISO(date), "MMM d"),
+            adherence,
+            pain: avg(stats.painRatings || []),
+            energy: avg(stats.energyRatings || []),
+            anxiety: avg(stats.anxietyRatings || []),
+            mood: avg(stats.moodRatings || []),
+          };
+        });
+
+      setChartData(sorted);
     } catch (error) {
-    console.error("Error fetching data:", error);
+      console.error("Error fetching insights:", error);
     } finally {
-    setIsLoading(false);
+      setIsLoading(false);
     }
-};
-
- const dataToUse = medicationData;
-
- const labels = dataToUse.map(log => log.date);
- const adherenceData = dataToUse.map(log => 
-    log.medsPrescribed > 0 ? Math.round((log.medsTaken / log.medsPrescribed) * 100) : 0
-  );
-  const painData = dataToUse.map(log => log.painLevel);
-  const energyData = dataToUse.map(log => log.energyLevel);
-  const anxietyData = dataToUse.map(log => log.anxietyLevel);
-  const moodData = dataToUse.map(log => log.moodLevel);
-  
-  const chartConfig = {
-    backgroundGradientFrom: "#fff",
-    backgroundGradientTo: "#fff",
-    color: (opacity = 1) => `rgba(66, 133, 244, ${opacity})`,
-    strokeWidth: 2,
-    decimalPlaces: 0,
   };
-  
-  const renderChart = (title, data, yLabel, segments) => (
+
+  const renderChart = (title: string, data: number[], yLabel = "", segments = 4) => (
     <View style={{ marginBottom: 24 }}>
       <Text style={{ fontSize: 18, fontWeight: "600", marginBottom: 8 }}>{title}</Text>
       <LineChart
         data={{
-          labels,
+          labels: chartData.map((d) => d.date),
           datasets: [{ data }],
         }}
         width={screenWidth - 32}
@@ -130,30 +124,37 @@ export default function InsightsScreen() {
         chartConfig={chartConfig}
         bezier
         fromZero
-        yAxisInterval={1}
         segments={segments}
         style={{ borderRadius: 16 }}
       />
     </View>
   );
-  
+
+  const chartConfig = {
+    backgroundGradientFrom: "#fff",
+    backgroundGradientTo: "#fff",
+    color: (opacity = 1) => `rgba(66, 133, 244, ${opacity})`,
+    strokeWidth: 2,
+    decimalPlaces: 0,
+  };
+
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" color="#4285F4" />
         <Text style={{ marginTop: 10 }}>Loading insights...</Text>
       </View>
     );
   }
-  
+
   return (
     <ScrollView style={{ padding: 16 }}>
       <Text style={{ fontSize: 24, fontWeight: "700", marginBottom: 16 }}>Insights</Text>
-      {renderChart("Medication Adherence (%)", adherenceData, "%", 5)}
-      {renderChart("Pain Level (0–4)", painData, "", 4)}
-      {renderChart("Energy Level (0–4)", energyData, "", 4)}
-      {renderChart("Anxiety Level (0–4)", anxietyData, "", 4)}
-      {renderChart("Mood Level (0–4)", moodData, "", 4)}
+      {renderChart("Medication Adherence (%)", chartData.map((d) => d.adherence), "%", 5)}
+      {renderChart("Pain Level (0–4)", chartData.map((d) => d.pain))}
+      {renderChart("Energy Level (0–4)", chartData.map((d) => d.energy))}
+      {renderChart("Anxiety Level (0–4)", chartData.map((d) => d.anxiety))}
+      {renderChart("Mood Level (0–4)", chartData.map((d) => d.mood))}
     </ScrollView>
   );
 }
