@@ -13,6 +13,7 @@ import { MedicationDose } from '../types/MedicationDose';
 import MedicationGroupCard from '../components/MedCard';
 import AddDoseModal from '../components/AddDoseModal';
 import { useRouter } from 'expo-router';
+import { Modal } from 'react-native';
 
 export default function MedicationsScreen() {
   const [loading, setLoading] = useState(true);
@@ -90,16 +91,23 @@ export default function MedicationsScreen() {
         )}
       </ScrollView>
 
-      {editingGroup && (
+      <Modal
+  visible={!!editingGroup}
+  animationType="slide"
+  onRequestClose={() => setEditingGroup(null)}
+>
+  {editingGroup && (
         <AddDoseModal
           medicationGroup={editingGroup}
           onClose={() => setEditingGroup(null)}
           onSave={() => {
             setEditingGroup(null);
             setRefreshKey(prev => prev + 1);
+            router.replace(`/`);
           }}
         />
       )}
+    </Modal>
     </>
   );
 }

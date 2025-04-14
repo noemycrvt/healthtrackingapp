@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -13,19 +13,21 @@ import uuid from "react-native-uuid";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { db, auth } from "../firebaseConfig";
+import { Ionicons } from "@expo/vector-icons";
 import {
   collection,
   addDoc,
   query,
   getDocs,
   doc,
-  updateDoc,
   setDoc,
-  deleteDoc
+  deleteDoc,
 } from "firebase/firestore";
 import TimePickerModal from "./TimePickerModal";
 import { MedicationDose } from "../types/MedicationDose";
 import { MedicationGroup } from "../types/MedicationGroup";
+
+const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 interface Props {
   onClose: () => void;
@@ -38,18 +40,16 @@ export default function AddDoseModal({ onClose, onSave, medicationGroup }: Props
 
   const [name, setName] = useState(medicationGroup?.name || "");
   const [details, setDetails] = useState(medicationGroup?.details || "");
+  const [repeatDays, setRepeatDays] = useState<number[]>(medicationGroup?.repeatDays || []);
   const [times, setTimes] = useState<Date[]>(() => {
     if (!medicationGroup?.times) return [];
-    return medicationGroup.times
-      .map((t) => {
-        const [hour, minute] = t.split(":").map(Number);
-        const date = new Date();
-        date.setHours(hour, minute, 0, 0);
-        return date;
-      })
-      .sort((a, b) => a.getTime() - b.getTime());
+    return medicationGroup.times.map((t) => {
+      const [hour, minute] = t.split(":").map(Number);
+      const d = new Date();
+      d.setHours(hour, minute, 0, 0);
+      return d;
+    });
   });
-
   const [endDate, setEndDate] = useState<Date | null>(
     medicationGroup?.endDate ? new Date(medicationGroup.endDate) : null
   );
@@ -58,26 +58,33 @@ export default function AddDoseModal({ onClose, onSave, medicationGroup }: Props
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [activeTimeIndex, setActiveTimeIndex] = useState<number | null>(null);
 
+  const toggleDay = (index: number) => {
+    setRepeatDays((prev) =>
+      prev.includes(index) ? prev.filter((d) => d !== index) : [...prev, index]
+    );
+  };
+
   const handleSave = async () => {
-    if (isSaving || !endDate || times.length === 0) return;
+    if (isSaving || !endDate || times.length === 0 || repeatDays.length === 0) return;
+  
     setIsSaving(true);
     Toast.hide();
     Toast.show({ type: "info", text1: `${isEditing ? "Updating" : "Saving"}...` });
-
+  
     const user = auth.currentUser;
     if (!user) {
       Toast.show({ type: "error", text1: "User not logged in" });
       return;
     }
-
+  
     try {
       const now = new Date();
       const groupId = isEditing && medicationGroup
         ? medicationGroup.id
         : uuid.v4().toString();
-
+  
       const groupRef = doc(db, "users", user.uid, "medicationGroups", groupId);
-
+  
       const groupData: MedicationGroup = {
         id: groupId,
         name,
@@ -85,12 +92,12 @@ export default function AddDoseModal({ onClose, onSave, medicationGroup }: Props
         startDate: format(new Date(), "yyyy-MM-dd"),
         endDate: format(endDate, "yyyy-MM-dd"),
         times: times.map((t) => format(t, "HH:mm")),
-        scheduleType: "daily",
+        repeatDays,
         createdAt: new Date().toISOString(),
       };
-
+  
       await setDoc(groupRef, groupData, { merge: true });
-
+  
       const doseCollectionRef = collection(
         db,
         "users",
@@ -99,58 +106,62 @@ export default function AddDoseModal({ onClose, onSave, medicationGroup }: Props
         groupId,
         "doses"
       );
-
-      // If editing, delete future doses
+  
+      // If editing: delete future doses
       if (isEditing) {
         const snapshot = await getDocs(doseCollectionRef);
         const deletions = snapshot.docs.map((docSnap) => {
           const data = docSnap.data() as MedicationDose;
           if (isAfter(new Date(data.time), now)) {
-            return deleteDoc(docSnap.ref); // 👈 fixed here
+            return deleteDoc(docSnap.ref);
           }
           return null;
         });
         await Promise.all(deletions.filter(Boolean));
       }
-
+  
       // Generate new doses
       const doses: MedicationDose[] = [];
       let currentDate = new Date();
       const finalDate = new Date(endDate);
-
+  
       while (currentDate <= finalDate) {
-        times.forEach((t) => {
-          const doseDateTime = new Date(
-            currentDate.getFullYear(),
-            currentDate.getMonth(),
-            currentDate.getDate(),
-            t.getHours(),
-            t.getMinutes()
-          );
-
-          if (isAfter(doseDateTime, now)) {
-            doses.push({
-              id: uuid.v4().toString(),
-              date: format(doseDateTime, "yyyy-MM-dd"),
-              time: doseDateTime.toISOString(),
-              status: "pending",
-              createdAt: new Date().toISOString(),
-            });
-          }
-        });
-
+        if (repeatDays.includes(currentDate.getDay())) {
+          times.forEach((t) => {
+            const doseDateTime = new Date(
+              currentDate.getFullYear(),
+              currentDate.getMonth(),
+              currentDate.getDate(),
+              t.getHours(),
+              t.getMinutes()
+            );
+  
+            if (isAfter(doseDateTime, now)) {
+              doses.push({
+                id: uuid.v4().toString(),
+                date: format(doseDateTime, "yyyy-MM-dd"),
+                time: doseDateTime.toISOString(),
+                status: "pending",
+                createdAt: new Date().toISOString(),
+              });
+            }
+          });
+        }
+  
         currentDate = addDays(currentDate, 1);
       }
-
+  
       await Promise.all(doses.map((dose) => addDoc(doseCollectionRef, dose)));
-
+  
       Toast.show({
         type: "success",
         text1: isEditing ? "Medication group updated" : "Medication saved!",
       });
-
+  
+      // ✅ Only call these after everything is synced
       onSave();
       onClose();
+  
     } catch (error) {
       console.error("Failed to save/update medication:", error);
       Toast.show({
@@ -162,21 +173,77 @@ export default function AddDoseModal({ onClose, onSave, medicationGroup }: Props
     }
   };
 
-  const isFormValid = name && details && endDate && times.length > 0;
+  const handleDeleteFutureDoses = async () => {
+    const user = auth.currentUser;
+    if (!user || !medicationGroup) return;
+  
+    const now = new Date();
+    const groupRef = doc(db, "users", user.uid, "medicationGroups", medicationGroup.id);
+    const doseCollectionRef = collection(db, "users", user.uid, "medicationGroups", medicationGroup.id, "doses");
+  
+    try {
+      Toast.show({ type: "info", text1: "Deleting future instances..." });
+  
+      // Delete future doses
+      const snapshot = await getDocs(doseCollectionRef);
+      const deletions = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data() as MedicationDose;
+        if (isAfter(new Date(data.time), now)) {
+          return deleteDoc(docSnap.ref);
+        }
+        return null;
+      });
+  
+      await Promise.all(deletions.filter(Boolean));
+  
+      // 🔥 Update the group metadata to remove schedule
+      await setDoc(
+        groupRef,
+        {
+          repeatDays: [],
+          times: [],
+          endDate: null,
+        },
+        { merge: true }
+      );
+  
+      // Clear UI
+      setRepeatDays([]);
+      setTimes([]);
+      setEndDate(null);
+  
+      Toast.show({ type: "success", text1: "Future doses deleted" });
+    } catch (error) {
+      console.error("Failed to delete future doses:", error);
+      Toast.show({ type: "error", text1: "Failed to delete future doses" });
+    }
+    if (medicationGroup) {
+      medicationGroup.repeatDays = [];
+      medicationGroup.times = [];
+      medicationGroup.endDate = null;
+    }
+  };
+  
+  
+
+  const isFormValid = name && details && endDate && times.length > 0 && repeatDays.length > 0;
 
   return (
     <SafeAreaView className="flex-1 bg-white">
+      <View className="absolute top-9 left-4 z-50">
+        <Pressable onPress={onClose} className="p-2">
+          <Ionicons name="close" size={32} color="#4B5563" />
+        </Pressable>
+      </View>
       <ScrollView
         className="flex-1 px-5"
-        contentContainerStyle={{
-          paddingTop: Platform.OS === "ios" ? 60 : 40,
-        }}
+        contentContainerStyle={{ paddingTop: Platform.OS === "ios" ? 60 : 40 }}
       >
         <Text className="text-2xl font-bold mb-6 text-center">
           {isEditing ? "Edit Medication Group" : "Add Medication"}
         </Text>
 
-        {/* Medication Name */}
+        {/* Name */}
         <View className="mb-5">
           <Text className="text-base font-semibold mb-1">Medication Name</Text>
           <TextInput
@@ -207,11 +274,7 @@ export default function AddDoseModal({ onClose, onSave, medicationGroup }: Props
                 key={idx}
                 className="flex-row justify-between items-center bg-blue-100 border border-blue-300 px-4 py-3 rounded-xl mb-3"
               >
-                <Pressable
-                  onPress={() =>
-                    setTimes(times.filter((_, i) => i !== idx))
-                  }
-                >
+                <Pressable onPress={() => setTimes(times.filter((_, i) => i !== idx))}>
                   <Text className="text-red-900 font-bold text-xl">X</Text>
                 </Pressable>
                 <Text className="text-blue-900 text-base font-medium">
@@ -236,6 +299,32 @@ export default function AddDoseModal({ onClose, onSave, medicationGroup }: Props
           </View>
         </View>
 
+        {/* Repeat Days */}
+        <View className="mb-6">
+          <Text className="text-base font-semibold mb-2">Repeat On</Text>
+          <View className="flex-row flex-wrap gap-2">
+            {weekdays.map((day, i) => (
+              <Pressable
+                key={i}
+                onPress={() => toggleDay(i)}
+                className={`px-4 py-2 rounded-full border ${
+                  repeatDays.includes(i)
+                    ? "bg-blue-500 border-blue-500"
+                    : "bg-white border-gray-300"
+                }`}
+              >
+                <Text
+                  className={`${
+                    repeatDays.includes(i) ? "text-white" : "text-gray-800"
+                  }`}
+                >
+                  {day}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
         {/* End Date */}
         <View className="mb-6">
           <Text className="text-base font-semibold mb-1">Repeat Until</Text>
@@ -243,9 +332,7 @@ export default function AddDoseModal({ onClose, onSave, medicationGroup }: Props
             onPress={() => setShowEndPicker(true)}
             className="border rounded px-3 py-2 bg-white"
           >
-            <Text>
-              {endDate ? format(endDate, "MMMM d, yyyy") : "Select end date"}
-            </Text>
+            <Text>{endDate ? format(endDate, "MMMM d, yyyy") : "Select end date"}</Text>
           </Pressable>
           {showEndPicker && (
             <DateTimePicker
@@ -278,7 +365,19 @@ export default function AddDoseModal({ onClose, onSave, medicationGroup }: Props
           </Pressable>
         </View>
       </ScrollView>
-
+      {/* Fixed Delete Button at the bottom */}
+      {isEditing && (
+        <View className="px-5 pb-6 bg-white">
+          <Pressable
+            onPress={handleDeleteFutureDoses}
+            className="w-full bg-red-600 py-3 rounded"
+          >
+            <Text className="text-white font-semibold text-center">
+              Delete Future Instances
+            </Text>
+          </Pressable>
+        </View>
+      )}
       {/* Time Picker Modal */}
       <TimePickerModal
         visible={modalVisible}
