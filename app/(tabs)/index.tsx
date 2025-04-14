@@ -4,12 +4,21 @@ import {
   Text,
   ScrollView,
   Modal,
+  Pressable,
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "../../firebaseConfig";
+import {
+  collection,
+  getDocs,
+  doc,
+  setDoc,
+  orderBy,
+  query,
+} from "firebase/firestore";
 
+import { auth, db } from "../../firebaseConfig";
 import { UserContext } from "../../context/UserContext";
 import FloatingButton from "../../components/FloatingButton";
 import MedScheduleCard from "../../components/MedScheduleCard";
@@ -17,9 +26,9 @@ import AddDoseModal from "../../components/AddDoseModal";
 import NextDoseCard from "../../components/NextDoseCard";
 import AffirmationCard from "../../components/AffirmationCard";
 import { MedicationDose } from "../../types/MedicationDose";
+import { MedicationGroup } from "../../types/MedicationGroup";
 import { format } from "date-fns";
 
-// Get greeting based on current hour
 const getTimeGreeting = () => {
   const hour = new Date().getHours();
   if (hour < 12) return "Good morning";
@@ -32,53 +41,103 @@ export default function HomeScreen() {
   const { userName, loadingUser } = useContext(UserContext);
 
   const [showAddModal, setShowAddModal] = useState(false);
-  const [userDoses, setUserDoses] = useState<MedicationDose[]>([]);
+  const [editingGroup, setEditingGroup] = useState<MedicationGroup | null>(null);
+  const [userDoses, setUserDoses] = useState<(MedicationDose & { group: MedicationGroup })[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const weekdayIndex = new Date().getDay();
+  const todayStr = format(new Date(), "yyyy-MM-dd");
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         router.replace("/account");
+      } else {
+        await fetchUserDoses(user.uid);
       }
       setLoading(false);
     });
 
     return unsubscribe;
-  }, []);
+  }, [refreshKey]);
+
+  const fetchUserDoses = async (uid: string) => {
+    try {
+      const groupsRef = collection(db, "users", uid, "medicationGroups");
+      const groupSnap = await getDocs(groupsRef);
+      const groupList = groupSnap.docs.map((doc) => doc.data() as MedicationGroup);
+
+      const allDoses: (MedicationDose & { group: MedicationGroup })[] = [];
+
+      for (const group of groupList) {
+        const dosesRef = collection(db, "users", uid, "medicationGroups", group.id, "doses");
+        const q = query(dosesRef, orderBy("time"));
+        const snapshot = await getDocs(q);
+        const groupDoses = snapshot.docs.map((doc) => doc.data() as MedicationDose);
+        allDoses.push(...groupDoses.map(d => ({ ...d, group })));
+      }
+
+      const todayFiltered = allDoses.filter((d) => d.date === todayStr);
+      setUserDoses(todayFiltered);
+    } catch (error) {
+      console.error("Error fetching doses:", error);
+    }
+  };
+
+  const markDoseStatus = async (doseId: string, status: "taken" | "skipped") => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+      const groupsRef = collection(db, "users", user.uid, "medicationGroups");
+      const groupSnap = await getDocs(groupsRef);
+
+      for (const groupDoc of groupSnap.docs) {
+        const dosesRef = collection(db, "users", user.uid, "medicationGroups", groupDoc.id, "doses");
+        const doseSnap = await getDocs(dosesRef);
+
+        for (const doc of doseSnap.docs) {
+          if (doc.data().id === doseId) {
+            await setDoc(doc.ref, { status }, { merge: true });
+            await fetchUserDoses(user.uid);
+            return;
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to update dose status:", error);
+    }
+  };
 
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(new Date());
-    }, 60000); // refresh every 60 seconds
-
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
 
-  const todayDoses = userDoses.filter((dose) =>
-    dose.repeatDays.includes(weekdayIndex)
-  );
-
-  const groupedByTime = todayDoses.reduce((acc, curr) => {
+  const groupedByTime = userDoses.reduce((acc, curr) => {
     const formattedTime = format(new Date(curr.time), "h:mm a");
     if (!acc[formattedTime]) acc[formattedTime] = [];
-    acc[formattedTime].push({ name: curr.name, details: curr.details });
+    acc[formattedTime].push(curr);
     return acc;
-  }, {} as Record<string, { name: string; details: string }[]>);
+  }, {} as Record<string, (MedicationDose & { group: MedicationGroup })[]>);
 
-  const sortedTimes = Object.keys(groupedByTime);
+  const sortedTimes = Object.keys(groupedByTime).sort((a, b) => {
+    const toDate = (t: string) => new Date(`1970-01-01T${t}`);
+    return toDate(a).getTime() - toDate(b).getTime();
+  });
 
   const getNextDose = () => {
     const now = new Date();
-    const upcoming = todayDoses
+    const upcoming = userDoses
       .map((dose) => ({
         ...dose,
-        date: new Date(dose.time),
+        dateObj: new Date(dose.time),
       }))
-      .filter((dose) => dose.date > now)
-      .sort((a, b) => a.date.getTime() - b.date.getTime());
+      .filter((dose) => dose.dateObj > now)
+      .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
 
     return upcoming[0];
   };
@@ -105,10 +164,20 @@ export default function HomeScreen() {
           nextCheckin="Next Check-In: 9:00 AM"
         />
 
+        <Pressable
+          onPress={() => router.push("/Medications")}
+          className="bg-blue-500 px-4 py-2 rounded mb-4 mt-2"
+        >
+          <Text className="text-white text-center">View All Medications</Text>
+        </Pressable>
+
         <NextDoseCard
           doseText={
             nextDose
-              ? `Next Dose: ${nextDose.name} @ ${format(new Date(nextDose.time), "h:mm a")}`
+              ? `Next Dose: ${nextDose.group.name} @ ${format(
+                  new Date(nextDose.time),
+                  "h:mm a"
+                )}`
               : "No more doses today 🎉"
           }
         />
@@ -119,17 +188,36 @@ export default function HomeScreen() {
           <Text className="text-base mt-2">No scheduled medications today.</Text>
         ) : (
           sortedTimes.map((time) => (
-            <MedScheduleCard key={time} time={time} meds={groupedByTime[time]} />
+            <MedScheduleCard
+              key={time}
+              time={time}
+              meds={groupedByTime[time]}
+              onTake={(doseId) => markDoseStatus(doseId, "taken")}
+              onSkip={(doseId) => markDoseStatus(doseId, "skipped")}
+            />
           ))
         )}
       </ScrollView>
 
-      <FloatingButton onPress={() => setShowAddModal(true)} />
+      <FloatingButton
+        onPress={() => {
+          setEditingGroup(null);
+          setShowAddModal(true);
+        }}
+      />
 
       <Modal visible={showAddModal} animationType="slide">
         <AddDoseModal
-          onClose={() => setShowAddModal(false)}
-          onSave={(dose) => setUserDoses((prev) => [...prev, dose])}
+          medicationGroup={editingGroup || undefined}
+          onClose={() => {
+            setShowAddModal(false);
+            setEditingGroup(null);
+          }}
+          onSave={() => {
+            setEditingGroup(null);
+            setShowAddModal(false);
+            setRefreshKey((prev) => prev + 1);
+          }}
         />
       </Modal>
     </View>

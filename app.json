@@ -34,7 +34,16 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-build-properties"
+      [
+      "expo-build-properties",
+      {
+        "ios": {
+          "infoPlist": {
+            "UIBackgroundModes": ["fetch", "remote-notification"]
+          }
+        }
+      }
+    ]
     ],
     "experiments": {
       "typedRoutes": true
