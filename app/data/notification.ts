@@ -3,12 +3,13 @@ import * as Device from 'expo-device';
 import { Alert, Platform } from 'react-native';
 
 export async function requestNotificationPermissions() {
-  if (Device.isDevice) {
+  // if (Device.isDevice) {
     const { status } = await Notifications.requestPermissionsAsync();
+    console.log("Requesting permission")
     if (status !== 'granted') {
       Alert.alert('Permission required', 'Please enable notifications to get medication reminders.');
     }
-  }
+  // }
 }
 
 // optional: configure notification behavior

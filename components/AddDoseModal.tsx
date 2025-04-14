@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { db, auth } from "../firebaseConfig";
 import { Ionicons } from "@expo/vector-icons";
+import * as Notifications from "expo-notifications";
+import { requestNotificationPermissions } from "../app/data/notification";
 import {
   collection,
   addDoc,
@@ -25,10 +27,7 @@ import {
 } from "firebase/firestore";
 import TimePickerModal from "./TimePickerModal";
 import { MedicationDose } from "../types/MedicationDose";
-import { SafeAreaView } from "react-native-safe-area-context";
-import Toast from 'react-native-toast-message';
-import { db, auth } from '../firebaseConfig';
-import { collection, addDoc } from 'firebase/firestore';
+import { MedicationGroup } from "../types/MedicationGroup";
 
 const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -71,55 +70,126 @@ export default function AddDoseModal({ onClose, onSave, medicationGroup }: Props
     );
   };
 
+  const scheduleNotification = async (dose: MedicationDose) => {
+    const timestamp = new Date(dose.time).getTime();
+  
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `Time to take ${name}`,
+        body: details,
+        sound: true,
+      },
+      trigger: {
+        type: "date",
+        timestamp,
+      } as any, // 👈 type-cast to bypass TypeScript limitation
+    });
+  };
+
   const handleSave = async () => {
     if (isSaving || !endDate || times.length === 0 || repeatDays.length === 0) return;
-  
+
     setIsSaving(true);
     Toast.hide();
     Toast.show({ type: "info", text1: `${isEditing ? "Updating" : "Saving"}...` });
-  
+
     const user = auth.currentUser;
     if (!user) {
       Toast.show({ type: "error", text1: "User not logged in" });
       return;
     }
 
-    const parsedDoses = parseInt(totalDoses, 10);
-    const medicationId = uuid.v4().toString(); // ✅ shared ID for all generated doses
-    const doses: MedicationDose[] = [];
-    let currentDate = new Date();
-
-    while (doses.length < parsedDoses) {
-      if (repeatDays.includes(currentDate.getDay())) {
-        const doseDateTime = new Date(
-          currentDate.getFullYear(),
-          currentDate.getMonth(),
-          currentDate.getDate(),
-          time.getHours(),
-          time.getMinutes()
-        );
-
-        doses.push({
-          id: uuid.v4().toString(),
-          medicationId,
-          name,
-          details,
-          time: doseDateTime.toISOString(),
-          date: format(doseDateTime, 'yyyy-MM-dd'),
-          status: 'pending',
-          createdAt: new Date().toISOString(),
-        });
-      }
-      currentDate = addDays(currentDate, 1);
-    }
-
     try {
-      const userMedRef = collection(db, 'users', user.uid, 'medications');
-      await Promise.all(doses.map(dose => addDoc(userMedRef, dose)));
-      doses.forEach(onSave); // locally push each one
-      Toast.show({ type: 'success', text1: 'Medication saved!' });
+      const now = new Date();
+      const groupId = isEditing && medicationGroup
+        ? medicationGroup.id
+        : uuid.v4().toString();
+
+      const groupRef = doc(db, "users", user.uid, "medicationGroups", groupId);
+
+      const groupData: MedicationGroup = {
+        id: groupId,
+        name,
+        details,
+        startDate: format(new Date(), "yyyy-MM-dd"),
+        endDate: format(endDate, "yyyy-MM-dd"),
+        times: times.map((t) => format(t, "HH:mm")),
+        repeatDays,
+        createdAt: new Date().toISOString(),
+      };
+
+      await setDoc(groupRef, groupData, { merge: true });
+
+      const doseCollectionRef = collection(
+        db,
+        "users",
+        user.uid,
+        "medicationGroups",
+        groupId,
+        "doses"
+      );
+
+      // If editing: delete future doses
+      if (isEditing) {
+        const snapshot = await getDocs(doseCollectionRef);
+        const deletions = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data() as MedicationDose;
+          const doseTime = new Date(data.time);
+          if (isAfter(doseTime, now) && data.status === "pending") {
+            return deleteDoc(docSnap.ref);
+          }
+          return null;
+        });
+        await Promise.all(deletions.filter(Boolean));
+      }
+
+      // Generate and save new doses
+      const doses: MedicationDose[] = [];
+      let currentDate = new Date();
+      const finalDate = new Date(endDate);
+
+      while (currentDate <= finalDate) {
+        if (repeatDays.includes(currentDate.getDay())) {
+          times.forEach((t) => {
+            const doseDateTime = new Date(
+              currentDate.getFullYear(),
+              currentDate.getMonth(),
+              currentDate.getDate(),
+              t.getHours(),
+              t.getMinutes()
+            );
+
+            if (isAfter(doseDateTime, now)) {
+              const dose: MedicationDose = {
+                id: uuid.v4().toString(),
+                date: format(doseDateTime, "yyyy-MM-dd"),
+                time: doseDateTime.toISOString(),
+                status: "pending",
+                createdAt: new Date().toISOString(),
+              };
+
+              doses.push(dose);
+            }
+          });
+        }
+        currentDate = addDays(currentDate, 1);
+      }
+
+      await Promise.all(
+        doses.map(async (dose) => {
+          await addDoc(doseCollectionRef, dose);
+          await scheduleNotification(dose); // ⏰ Notify!
+        })
+      );
+
+      Toast.show({
+        type: "success",
+        text1: isEditing ? "Medication group updated" : "Medication saved!",
+      });
+
+      onSave();
       onClose();
-  
+
     } catch (error) {
       console.error("Failed to save/update medication:", error);
       Toast.show({
@@ -134,15 +204,14 @@ export default function AddDoseModal({ onClose, onSave, medicationGroup }: Props
   const handleDeleteFutureDoses = async () => {
     const user = auth.currentUser;
     if (!user || !medicationGroup) return;
-  
+
     const now = new Date();
     const groupRef = doc(db, "users", user.uid, "medicationGroups", medicationGroup.id);
     const doseCollectionRef = collection(db, "users", user.uid, "medicationGroups", medicationGroup.id, "doses");
-  
+
     try {
       Toast.show({ type: "info", text1: "Deleting future instances..." });
-  
-      // Delete future doses
+
       const snapshot = await getDocs(doseCollectionRef);
       const deletions = snapshot.docs.map((docSnap) => {
         const data = docSnap.data() as MedicationDose;
@@ -151,40 +220,28 @@ export default function AddDoseModal({ onClose, onSave, medicationGroup }: Props
         }
         return null;
       });
-  
+
       await Promise.all(deletions.filter(Boolean));
-  
-      // 🔥 Update the group metadata to remove schedule
+
       await setDoc(
         groupRef,
-        {
-          repeatDays: [],
-          times: [],
-          endDate: null,
-        },
+        { repeatDays: [], times: [], endDate: null },
         { merge: true }
       );
-  
-      // Clear UI
+
       setRepeatDays([]);
       setTimes([]);
       setEndDate(null);
-  
+
       Toast.show({ type: "success", text1: "Future doses deleted" });
     } catch (error) {
       console.error("Failed to delete future doses:", error);
       Toast.show({ type: "error", text1: "Failed to delete future doses" });
     }
-    if (medicationGroup) {
-      medicationGroup.repeatDays = [];
-      medicationGroup.times = [];
-      medicationGroup.endDate = null;
-    }
   };
-  
-  
 
-  const isFormValid = name && details && endDate && times.length > 0 && repeatDays.length > 0;
+  const isFormValid =
+    name && details && endDate && times.length > 0 && repeatDays.length > 0;
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -343,3 +400,15 @@ export default function AddDoseModal({ onClose, onSave, medicationGroup }: Props
         onChange={(selected) => {
           if (activeTimeIndex !== null) {
             const updated = [...times];
+            updated[activeTimeIndex] = selected;
+            setTimes(updated);
+          }
+        }}
+        onClose={() => {
+          setModalVisible(false);
+          setActiveTimeIndex(null);
+        }}
+      />
+    </SafeAreaView>
+  );
+}
