@@ -42,6 +42,7 @@ export default function HomeScreen() {
   const [userDoses, setUserDoses] = useState<(MedicationDose & { group: MedicationGroup })[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0); // 👈 NEW
 
   const todayStr = format(new Date(), "yyyy-MM-dd");
 
@@ -56,7 +57,7 @@ export default function HomeScreen() {
     });
 
     return unsubscribe;
-  }, [showAddModal]);
+  }, [refreshKey]); // 👈 UPDATED
 
   const fetchUserDoses = async (uid: string) => {
     try {
@@ -135,7 +136,7 @@ export default function HomeScreen() {
           nextCheckin="Next Check-In: 9:00 AM"
         />
         <Pressable
-          onPress={() => router.push("/medications")}
+          onPress={() => router.push("/Medications")}
           className="bg-blue-500 px-4 py-2 rounded mb-4 mt-2"
         >
           <Text className="text-white text-center">View All Medications</Text>
@@ -192,7 +193,8 @@ export default function HomeScreen() {
           }}
           onSave={() => {
             setEditingGroup(null);
-            fetchUserDoses(auth.currentUser?.uid || "");
+            setShowAddModal(false);
+            setRefreshKey(prev => prev + 1); // 👈 TRIGGER REFRESH
           }}
         />
       </Modal>

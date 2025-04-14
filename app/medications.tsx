@@ -15,6 +15,10 @@ import AddDoseModal from '../components/AddDoseModal';
 import { useRouter } from 'expo-router';
 import { Modal } from 'react-native';
 
+export const screenOptions = {
+  title: "Medications",
+  headerBackTitle: "Home", // 👈 this controls the back button text
+};
 export default function MedicationsScreen() {
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<MedicationGroup[]>([]);
