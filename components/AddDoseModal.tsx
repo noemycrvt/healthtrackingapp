@@ -112,12 +112,16 @@ export default function AddDoseModal({ onClose, onSave, medicationGroup }: Props
         const snapshot = await getDocs(doseCollectionRef);
         const deletions = snapshot.docs.map((docSnap) => {
           const data = docSnap.data() as MedicationDose;
-          if (isAfter(new Date(data.time), now)) {
+          const doseTime = new Date(data.time);
+        
+          if (
+            isAfter(doseTime, now) &&
+            data.status === "pending"
+          ) {
             return deleteDoc(docSnap.ref);
           }
           return null;
-        });
-        await Promise.all(deletions.filter(Boolean));
+        });        await Promise.all(deletions.filter(Boolean));
       }
   
       // Generate new doses
