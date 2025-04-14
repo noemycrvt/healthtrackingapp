@@ -4,6 +4,9 @@ import { LineChart } from "react-native-chart-kit";
 import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
 import { db, auth } from "../../firebaseConfig";
 import { format, subDays, parseISO, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
+
 
 const screenWidth = Dimensions.get("window").width;
 
@@ -11,9 +14,11 @@ export default function InsightsScreen() {
   const [medicationData, setMedicationData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  useEffect(() => {
-    fetchMedicationData();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchMedicationData();
+    }, [])
+  );  
   
   const fetchMedicationData = async () => {
     try {
