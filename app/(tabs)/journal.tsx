@@ -13,6 +13,8 @@ import { auth, db } from "../../firebaseConfig";
 import FloatingButton from "../../components/FloatingButton";
 import JournalEntry from "../../components/JournalEntry";
 import { format } from "date-fns";
+import { deleteDoc, doc } from "firebase/firestore";
+
 
 
 interface JournalEntryType {
@@ -76,26 +78,44 @@ export default function JournalPage() {
     );
   }
 
+  const handleDelete = async (entryId: string) => {
+    const user = auth.currentUser;
+    if (!user) return;
+  
+    try {
+      const entryRef = doc(db, "users", user.uid, "journalEntries", entryId);
+      await deleteDoc(entryRef);
+      setEntries(prev => prev.filter(entry => entry.id !== entryId)); // Optimistic UI update
+    } catch (e) {
+      console.error("Failed to delete journal entry", e);
+    }
+  };
+  
+
   return (
     <View className="flex-1 bg-gray-100">
       <ScrollView className="grow px-4">
         <Text className="text-2xl font-bold mt-4">Your Journal Entries</Text>
         {entries.length === 0 ? (
-          <Text className="mt-4 text-base">No journal entries yet.</Text>
-        ) : (
-          entries.map((entry) => (
-            <Pressable key={entry.id} onPress={() => setSelectedEntry(entry)}>
-              <View className="bg-white rounded-md shadow p-4 my-2">
-                <Text className="text-xs text-gray-500">
-                  {format(new Date(entry.date), "MMMM d, yyyy")}
-                </Text>
-                <Text className="text-sm mt-2 text-gray-700">
-                  {entry.journalEntry?.slice(0, 100) || "No entry written."}
-                </Text>
-              </View>
-            </Pressable>
-          ))
-        )}
+        <Text className="mt-4 text-base">No journal entries yet.</Text>
+) : (
+  entries.map((entry) => (
+    <View key={entry.id} className="bg-white rounded-md shadow p-4 my-2 flex-row justify-between items-center">
+      <Pressable onPress={() => setSelectedEntry(entry)} className="flex-1 pr-4">
+        <Text className="text-xs text-gray-500">
+          {format(new Date(entry.date), "MMMM d, yyyy")}
+        </Text>
+        <Text className="text-sm mt-2 text-gray-700">
+          {entry.journalEntry?.slice(0, 100) || "No entry written."}
+        </Text>
+      </Pressable>
+      <Pressable onPress={() => handleDelete(entry.id)} className="ml-2">
+        <Text className="text-black-500 text-xl">✕</Text>
+      </Pressable>
+    </View>
+  ))
+)}
+
       </ScrollView>
 
       <FloatingButton onPress={() => setShowModal(true)} />
@@ -108,16 +128,16 @@ export default function JournalPage() {
       </Modal>
 
       <Modal visible={!!selectedEntry} animationType="slide">
-  <JournalEntry
-    existingEntry={selectedEntry}
-    isEditMode={true}
-    onCancel={() => setSelectedEntry(null)}
-    onSave={() => {
-      setSelectedEntry(null);
-      setRefreshFlag(prev => !prev);
-    }}
-  />
-</Modal>
+      <JournalEntry
+        existingEntry={selectedEntry}
+        isEditMode={true}
+        onCancel={() => setSelectedEntry(null)}
+        onSave={() => {
+        setSelectedEntry(null);
+        setRefreshFlag(prev => !prev);
+      }}
+    />
+    </Modal>
     </View>
   );
 }
