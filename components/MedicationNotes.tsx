@@ -1,3 +1,4 @@
+
 // components/MedicationNotes.tsx
 import { useState } from 'react';
 
@@ -41,12 +42,13 @@ export function useMedicationNotes() {
     effectiveness,
     setEffectiveness,
     sideEffects,
+    setSideEffects,
     newEffect,
     setNewEffect,
     isAdding,
     setIsAdding,
     addCustomEffect,
     deleteEffect,
+    setSelectedEffects,
   };
 }
-
