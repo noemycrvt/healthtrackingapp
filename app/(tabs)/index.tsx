@@ -9,13 +9,16 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth, db } from "../../firebaseConfig";
 import {
   collection,
   getDocs,
-  query,
+  doc,
+  setDoc,
   orderBy,
+  query,
 } from "firebase/firestore";
+
+import { auth, db } from "../../firebaseConfig";
 import { UserContext } from "../../context/UserContext";
 import FloatingButton from "../../components/FloatingButton";
 import MedScheduleCard from "../../components/MedScheduleCard";
@@ -42,7 +45,7 @@ export default function HomeScreen() {
   const [userDoses, setUserDoses] = useState<(MedicationDose & { group: MedicationGroup })[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0); // 👈 NEW
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const todayStr = format(new Date(), "yyyy-MM-dd");
 
@@ -57,7 +60,7 @@ export default function HomeScreen() {
     });
 
     return unsubscribe;
-  }, [refreshKey]); // 👈 UPDATED
+  }, [refreshKey]);
 
   const fetchUserDoses = async (uid: string) => {
     try {
@@ -79,6 +82,31 @@ export default function HomeScreen() {
       setUserDoses(todayFiltered);
     } catch (error) {
       console.error("Error fetching doses:", error);
+    }
+  };
+
+  const markDoseStatus = async (doseId: string, status: "taken" | "skipped") => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+      const groupsRef = collection(db, "users", user.uid, "medicationGroups");
+      const groupSnap = await getDocs(groupsRef);
+
+      for (const groupDoc of groupSnap.docs) {
+        const dosesRef = collection(db, "users", user.uid, "medicationGroups", groupDoc.id, "doses");
+        const doseSnap = await getDocs(dosesRef);
+
+        for (const doc of doseSnap.docs) {
+          if (doc.data().id === doseId) {
+            await setDoc(doc.ref, { status }, { merge: true });
+            await fetchUserDoses(user.uid);
+            return;
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to update dose status:", error);
     }
   };
 
@@ -135,6 +163,7 @@ export default function HomeScreen() {
           affirmation="“You are safe. Take a few deep breaths—your strength is greater than your anxiety.”"
           nextCheckin="Next Check-In: 9:00 AM"
         />
+
         <Pressable
           onPress={() => router.push("/Medications")}
           className="bg-blue-500 px-4 py-2 rounded mb-4 mt-2"
@@ -163,15 +192,8 @@ export default function HomeScreen() {
               key={time}
               time={time}
               meds={groupedByTime[time]}
-              onEdit={(groupId) => {
-                const found = userDoses.find((d) => d.group.id === groupId);
-                if (found?.group) {
-                  setEditingGroup(found.group);
-                  setShowAddModal(true);
-                }
-              }}
-              onDelete={(groupId) => console.log("Delete group:", groupId)}
-              onMarkTaken={(groupId) => console.log("Mark taken for group:", groupId)}
+              onTake={(doseId) => markDoseStatus(doseId, "taken")}
+              onSkip={(doseId) => markDoseStatus(doseId, "skipped")}
             />
           ))
         )}
@@ -194,7 +216,7 @@ export default function HomeScreen() {
           onSave={() => {
             setEditingGroup(null);
             setShowAddModal(false);
-            setRefreshKey(prev => prev + 1); // 👈 TRIGGER REFRESH
+            setRefreshKey((prev) => prev + 1);
           }}
         />
       </Modal>
