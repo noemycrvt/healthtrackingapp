@@ -26,9 +26,8 @@ export default function InsightsScreen() {
         return;
       }
       
-      // Get the last 7 days of data
       const endDate = new Date();
-      const startDate = subDays(endDate, 6); // 7 days including today
+      const startDate = subDays(endDate, 6);
       
       const dateRange = [];
       for (let i = 0; i < 7; i++) {
@@ -36,7 +35,6 @@ export default function InsightsScreen() {
         dateRange.unshift(format(date, "yyyy-MM-dd"));
       }
       
-      // Fetch all medications for the user within the date range
       const medsRef = collection(db, "users", user.uid, "medications");
       const querySnapshot = await getDocs(medsRef);
       
@@ -47,43 +45,57 @@ export default function InsightsScreen() {
           name: data.name,
           time: data.time,
           date: data.date,
-          status: data.status || "pending",
-          /*status: "taken" pretend everything is taken for test */
+          status: data.status || "Pending",
         };
       });
+
+        // Fetch Journal Entries 
+    const journalRef = collection(db, "users", user.uid, "journalEntries");
+    const journalSnapshot = await getDocs(journalRef);
+    const allJournals = journalSnapshot.docs.map(doc => doc.data());
+  
+    const processedData = dateRange.map(dateStr => {
+    const displayDate = format(parseISO(dateStr), "MMM d");
+
+      // Medication data
+      const medsForDay = allMedications.filter(med => med.date === dateStr);
+      const medsTaken = medsForDay.filter(med => med.status === "taken").length;
+      const medsPrescribed = medsForDay.length;
+
+
+      // Journal data
+      const journalsForDay = allJournals.filter(entry => {
+      const entryDate = new Date(entry.date); 
+      return format(entryDate, "yyyy-MM-dd") === dateStr;
+    });
+  
       
-      // Process data by day
-      const processedData = dateRange.map(date => {
-        const dayMeds = allMedications.filter(med => med.date === date);
-        
-        return {
-          date: format(parseISO(date), "MMM d"),
-          medsTaken: dayMeds.filter(med => med.status === "taken").length,
-          medsPrescribed: dayMeds.length,
-          // Set default values for other metrics (you can replace these with actual data when available)
-          painLevel: Math.floor(Math.random() * 5),
-          energyLevel: Math.floor(Math.random() * 5),
-          anxietyLevel: Math.floor(Math.random() * 5),
-          moodLevel: Math.floor(Math.random() * 5)
+      const avg = (values) =>
+        values.length ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : 0;
+      
+      return {
+        date: displayDate,
+        medsTaken,
+        medsPrescribed,
+        painLevel: avg(journalsForDay.map(j => j.painRating ?? 0)),
+        energyLevel: avg(journalsForDay.map(j => j.energyRating ?? 0)),
+        anxietyLevel: avg(journalsForDay.map(j => j.anxietyRating ?? 0)), 
+        moodLevel: avg(journalsForDay.map(j => j.moodRating ?? 0)),
         };
-      });
-      
-      setMedicationData(processedData);
+    });
+
+    setMedicationData(processedData);
     } catch (error) {
-      console.error("Error fetching medication data:", error);
-      // Fall back to sample data if there's an error
-      setMedicationData(sampleLogs);
+    console.error("Error fetching data:", error);
     } finally {
-      setIsLoading(false);
+    setIsLoading(false);
     }
-  };
-  
-  // Use sample data until Firebase data loads
-  const dataToUse = medicationData.length > 0 ? medicationData : sampleLogs;
-  
-  // Process data for charts
-  const labels = dataToUse.map(log => log.date);
-  const adherenceData = dataToUse.map(log => 
+};
+
+ const dataToUse = medicationData;
+
+ const labels = dataToUse.map(log => log.date);
+ const adherenceData = dataToUse.map(log => 
     log.medsPrescribed > 0 ? Math.round((log.medsTaken / log.medsPrescribed) * 100) : 0
   );
   const painData = dataToUse.map(log => log.painLevel);
@@ -140,52 +152,3 @@ export default function InsightsScreen() {
     </ScrollView>
   );
 }
-
-// Sample data to use when Firebase data is not available
-const sampleLogs = [
-  {
-    date: "Apr 6",
-    medsTaken: 3,
-    medsPrescribed: 4,
-    painLevel: 2,
-    energyLevel: 3,
-    anxietyLevel: 2,
-    moodLevel: 3,
-  },
-  {
-    date: "Apr 7",
-    medsTaken: 2,
-    medsPrescribed: 4,
-    painLevel: 3,
-    energyLevel: 2,
-    anxietyLevel: 3,
-    moodLevel: 1,
-  },
-  {
-    date: "Apr 8",
-    medsTaken: 4,
-    medsPrescribed: 4,
-    painLevel: 1,
-    energyLevel: 4,
-    anxietyLevel: 1,
-    moodLevel: 4,
-  },
-  {
-    date: "Apr 9",
-    medsTaken: 4,
-    medsPrescribed: 4,
-    painLevel: 0,
-    energyLevel: 3,
-    anxietyLevel: 1,
-    moodLevel: 4,
-  },
-  {
-    date: "Apr 10",
-    medsTaken: 3,
-    medsPrescribed: 4,
-    painLevel: 2,
-    energyLevel: 3,
-    anxietyLevel: 2,
-    moodLevel: 2,
-  },
-];
