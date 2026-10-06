@@ -110,7 +110,7 @@ export default function InsightsScreen() {
     }
   };
 
-  const renderChart = (title: string, data: number[], yLabel = "", segments = 4) => (
+  const renderChart = (title: string, data: number[], maxValue: number, yLabel = "", segments = 4) => (
     <View style={{ marginBottom: 24 }}>
       <Text style={{ fontSize: 18, fontWeight: "600", marginBottom: 8 }}>{title}</Text>
       <LineChart
@@ -124,6 +124,7 @@ export default function InsightsScreen() {
         chartConfig={chartConfig}
         bezier
         fromZero
+        fromNumber={maxValue}
         segments={segments}
         style={{ borderRadius: 16 }}
       />
@@ -150,11 +151,11 @@ export default function InsightsScreen() {
   return (
     <ScrollView style={{ padding: 16 }}>
       <Text style={{ fontSize: 24, fontWeight: "700", marginBottom: 16 }}>Insights</Text>
-      {renderChart("Medication Adherence (%)", chartData.map((d) => d.adherence), "%", 5)}
-      {renderChart("Pain Level (0–4)", chartData.map((d) => d.pain))}
-      {renderChart("Energy Level (0–4)", chartData.map((d) => d.energy))}
-      {renderChart("Anxiety Level (0–4)", chartData.map((d) => d.anxiety))}
-      {renderChart("Mood Level (0–4)", chartData.map((d) => d.mood))}
+      {renderChart("Medication Adherence (%)", chartData.map((d) => d.adherence), 100, "%", 5)}
+      {renderChart("Pain Level (0–4)", chartData.map((d) => d.pain), 4)}
+      {renderChart("Energy Level (0–4)", chartData.map((d) => d.energy), 4)}
+      {renderChart("Anxiety Level (0–4)", chartData.map((d) => d.anxiety), 4)}
+      {renderChart("Mood Level (0–4)", chartData.map((d) => d.mood), 4)}
     </ScrollView>
   );
 }

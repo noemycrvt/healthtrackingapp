@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, ActivityIndicator, Text } from 'react-native';
+import { ScrollView, ActivityIndicator, Text, Alert, Platform } from 'react-native';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../firebaseConfig';
 import {
@@ -7,6 +7,8 @@ import {
   getDocs,
   query,
   orderBy,
+  deleteDoc,
+  doc,
 } from 'firebase/firestore';
 import { MedicationGroup } from '../types/MedicationGroup';
 import { MedicationDose } from '../types/MedicationDose';
@@ -14,6 +16,7 @@ import MedicationGroupCard from '../components/MedCard';
 import AddDoseModal from '../components/AddDoseModal';
 import { useRouter } from 'expo-router';
 import { Modal } from 'react-native';
+import Toast from 'react-native-toast-message';
 
 export const screenOptions = {
   title: "Medications",
@@ -62,9 +65,45 @@ export default function MedicationsScreen() {
     }
   };
 
-  const handleDeleteGroup = (groupId: string) => {
-    console.log('Delete group', groupId);
-    // Optional: Implement delete logic here
+  const handleDeleteGroup = async (groupId: string) => {
+    const confirmed =
+      Platform.OS === 'web'
+        ? window.confirm('Delete this medication and all its scheduled doses? This cannot be undone.')
+        : await new Promise<boolean>((resolve) => {
+            Alert.alert(
+              'Delete Medication',
+              'Delete this medication and all its scheduled doses? This cannot be undone.',
+              [
+                { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+                { text: 'Delete', style: 'destructive', onPress: () => resolve(true) },
+              ],
+              { cancelable: true, onDismiss: () => resolve(false) }
+            );
+          });
+
+    if (!confirmed) return;
+
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+      const dosesRef = collection(db, 'users', user.uid, 'medicationGroups', groupId, 'doses');
+      const doseSnap = await getDocs(dosesRef);
+      await Promise.all(doseSnap.docs.map((d) => deleteDoc(d.ref)));
+      await deleteDoc(doc(db, 'users', user.uid, 'medicationGroups', groupId));
+
+      setGroups((prev) => prev.filter((g) => g.id !== groupId));
+      setGroupDoses((prev) => {
+        const updated = { ...prev };
+        delete updated[groupId];
+        return updated;
+      });
+
+      Toast.show({ type: 'success', text1: 'Medication deleted' });
+    } catch (error) {
+      console.error('Failed to delete medication group:', error);
+      Toast.show({ type: 'error', text1: 'Failed to delete medication' });
+    }
   };
 
   return (

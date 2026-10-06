@@ -343,22 +343,38 @@ export default function AddDoseModal({ onClose, onSave, medicationGroup }: Props
         {/* End Date */}
         <View className="mb-6">
           <Text className="text-base font-semibold mb-1">Repeat Until</Text>
-          <Pressable
-            onPress={() => setShowEndPicker(true)}
-            className="border rounded px-3 py-2 bg-white"
-          >
-            <Text>{endDate ? format(endDate, "MMMM d, yyyy") : "Select end date"}</Text>
-          </Pressable>
-          {showEndPicker && (
-            <DateTimePicker
-              value={endDate || new Date()}
-              mode="date"
-              display="default"
-              onChange={(_, date) => {
-                setShowEndPicker(false);
-                if (date) setEndDate(date);
-              }}
-            />
+          {Platform.OS === 'web' ? (
+            // @react-native-community/datetimepicker has no web implementation
+            // (it renders null there), so fall back to a native <input type="date">.
+            React.createElement('input', {
+              type: 'date',
+              value: endDate ? format(endDate, 'yyyy-MM-dd') : '',
+              onChange: (e: any) => {
+                const [year, month, day] = e.target.value.split('-').map(Number);
+                if (year && month && day) setEndDate(new Date(year, month - 1, day));
+              },
+              style: { fontSize: 16, padding: 8, border: '1px solid #d1d5db', borderRadius: 4, width: '100%' },
+            })
+          ) : (
+            <>
+              <Pressable
+                onPress={() => setShowEndPicker(true)}
+                className="border rounded px-3 py-2 bg-white"
+              >
+                <Text>{endDate ? format(endDate, "MMMM d, yyyy") : "Select end date"}</Text>
+              </Pressable>
+              {showEndPicker && (
+                <DateTimePicker
+                  value={endDate || new Date()}
+                  mode="date"
+                  display="default"
+                  onChange={(_, date) => {
+                    setShowEndPicker(false);
+                    if (date) setEndDate(date);
+                  }}
+                />
+              )}
+            </>
           )}
         </View>
 

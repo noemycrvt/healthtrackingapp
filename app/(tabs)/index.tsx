@@ -165,7 +165,7 @@ export default function HomeScreen() {
         />
 
         <Pressable
-          onPress={() => router.push("/Medications")}
+          onPress={() => router.push("/medications")}
           className="bg-blue-500 px-4 py-2 rounded mb-4 mt-2"
         >
           <Text className="text-white text-center">View All Medications</Text>
