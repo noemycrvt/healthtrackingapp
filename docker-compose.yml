@@ -1,0 +1,13 @@
+services:
+  firebase-emulators:
+    build: .
+    ports:
+      - "4000:4000" # Emulator UI
+      - "8080:8080" # Firestore
+      - "9099:9099" # Auth
+    volumes:
+      - ./emulator-data:/emulator/export
+      - firebase-emulator-cache:/root/.cache/firebase/emulators
+
+volumes:
+  firebase-emulator-cache:

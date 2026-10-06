@@ -1,25 +1,21 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 /* import { getAnalytics } from "firebase/analytics"; */
-import { initializeAuth, getReactNativePersistence } from "firebase/auth";
-import { getFirestore } from 'firebase/firestore';
+import { initializeAuth, getReactNativePersistence, connectAuthEmulator } from "firebase/auth";
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import ReactNativeAsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from 'react-native'; // 👈 platform detection
 import { getAuth } from 'firebase/auth';
 
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// Firebase config values come from .env (see .env.example), not hardcoded here.
 const firebaseConfig = {
-  apiKey: "AIzaSyCqAVSM4vxhwf1vfQxEm8R6ZGXyhJxrIWI",
-  authDomain: "healthtrackingapp-c0592.firebaseapp.com",
-  projectId: "healthtrackingapp-c0592",
-  storageBucket: "healthtrackingapp-c0592.firebasestorage.app",
-  messagingSenderId: "448977952305",
-  appId: "1:448977952305:web:e0e18d668963f5f5d1bf10",
-  measurementId: "G-6YYWXZMDC3"
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
 // Initialize Firebase
@@ -38,3 +34,10 @@ export const auth =
       });
 
 export const db = getFirestore(app);
+
+// Point at the local Firebase emulators (see docker-compose.yml) instead of
+// a real project when EXPO_PUBLIC_USE_FIREBASE_EMULATOR=true in .env.
+if (process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATOR === 'true') {
+  connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+  connectFirestoreEmulator(db, 'localhost', 8080);
+}
